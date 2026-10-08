@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { chess, chooseChessMove, fromFEN, legalMoves as chessMoves, makeMove as chessMake, type ChessPos } from './chess/engine';
 import { chooseGoMove, go, isLegalPlay, score } from './go/engine';
 import { chooseGomokuMove, gomoku, SIZE } from './gomoku/engine';
-import { chooseOthelloMove, legalMoves as othelloMoves, othello } from './othello/engine';
+import { chooseReversiMove, legalMoves as reversiMoves, reversi } from './reversi/engine';
 import {
   FU, HI, KI, OU,
   chooseShogiMove, initialPos, legalMoves as shogiMoves, makeMove as shogiMake, shogi, type ShogiPos, type ShogiState,
@@ -125,20 +125,20 @@ describe('将棋', () => {
   });
 });
 
-describe('オセロ', () => {
+describe('リバーシ', () => {
   it('初期局面の合法手は 4 つ', () => {
-    expect(othelloMoves(othello.initial({})).sort((a, b) => a - b)).toEqual([19, 26, 37, 44]);
+    expect(reversiMoves(reversi.initial({})).sort((a, b) => a - b)).toEqual([19, 26, 37, 44]);
   });
 
   it('石を挟んで返す', () => {
-    const s = othello.apply(othello.initial({}), 19);
+    const s = reversi.apply(reversi.initial({}), 19);
     expect(s.board[27]).toBe(1);
     expect(s.turn).toBe(1);
   });
 
   it('CPU が合法手を返す', () => {
-    const s = othello.initial({});
-    for (const lv of [1, 2, 3] as const) expect(othelloMoves(s)).toContain(chooseOthelloMove(s, lv));
+    const s = reversi.initial({});
+    for (const lv of [1, 2, 3] as const) expect(reversiMoves(s)).toContain(chooseReversiMove(s, lv));
   });
 });
 

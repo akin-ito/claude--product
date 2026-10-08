@@ -29,7 +29,7 @@ export const TIME_PRESETS: Record<string, TimePreset[]> = {
     { name: '5分＋1手10秒加算', time: { kind: 'fischer', mainSec: 300, incSec: 10 } },
     { name: '10分切れ負け', time: { kind: 'sudden', mainSec: 600 } },
   ],
-  othello: [
+  reversi: [
     none,
     { name: '10分切れ負け', time: { kind: 'sudden', mainSec: 600 } },
     { name: '20分切れ負け', time: { kind: 'sudden', mainSec: 1200 } },

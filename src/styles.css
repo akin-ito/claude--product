@@ -165,7 +165,7 @@ button {
   background: var(--wood);
   color: #1b1b1b;
 }
-.card-othello .game-icon {
+.card-reversi .game-icon {
   background: var(--felt);
   color: #fafafa;
 }
@@ -481,7 +481,7 @@ button:disabled {
   }
 }
 
-/* ------------------------------------------------------------ マス目の盤（オセロ・チェス・将棋） */
+/* ------------------------------------------------------------ マス目の盤（リバーシ・チェス・将棋） */
 
 .grid-board {
   width: var(--board);
@@ -520,8 +520,8 @@ button:disabled {
   border: 3px solid var(--hint);
 }
 
-/* オセロ */
-.grid-board.othello {
+/* リバーシ */
+.grid-board.reversi {
   grid-template-columns: repeat(8, 1fr);
   grid-template-rows: repeat(8, 1fr);
   gap: 2px;
@@ -530,11 +530,11 @@ button:disabled {
   border-radius: 6px;
 }
 
-.othello .cell {
+.reversi .cell {
   background: var(--felt);
 }
 
-.othello .cell.last {
+.reversi .cell.last {
   box-shadow: inset 0 0 0 3px rgba(255, 214, 10, 0.75);
 }
 
@@ -554,7 +554,7 @@ button:disabled {
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
 }
 
-.othello .hint-dot {
+.reversi .hint-dot {
   background: rgba(0, 0, 0, 0.3);
 }
 
@@ -1011,15 +1011,15 @@ button:disabled {
   font-size: 50cqw;
 }
 
-.dg-othello {
+.dg-reversi {
   gap: 1px;
   background: var(--felt-line);
   border: 1px solid var(--felt-line);
 }
-.dg-othello .dg-cell {
+.dg-reversi .dg-cell {
   background: var(--felt);
 }
-.dg-othello .disc.flipped {
+.dg-reversi .disc.flipped {
   box-shadow: 0 0 0 2px #e94b3c;
 }
 

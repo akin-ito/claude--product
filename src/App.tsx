@@ -2,7 +2,7 @@ import { useEffect, useState, type ComponentType } from 'react';
 import { ChessGame } from './games/chess/ChessGame';
 import { GoGame } from './games/go/GoGame';
 import { GomokuGame } from './games/gomoku/GomokuGame';
-import { OthelloGame } from './games/othello/OthelloGame';
+import { ReversiGame } from './games/reversi/ReversiGame';
 import { ShogiGame } from './games/shogi/ShogiGame';
 import { RulesPage } from './rules/RulesPage';
 
@@ -16,7 +16,7 @@ interface GameInfo {
 
 const GAMES: GameInfo[] = [
   { id: 'gomoku', name: '五目並べ', blurb: '5つ並べたら勝ち・連珠にも対応', icon: '●', Component: GomokuGame },
-  { id: 'othello', name: 'オセロ', blurb: '挟んでひっくり返す', icon: '◐', Component: OthelloGame },
+  { id: 'reversi', name: 'リバーシ', blurb: '挟んでひっくり返す', icon: '◐', Component: ReversiGame },
   { id: 'chess', name: 'チェス', blurb: 'キングを追い詰める', icon: '♞︎', Component: ChessGame },
   { id: 'shogi', name: '将棋', blurb: '取った駒を使える・駒落ちも', icon: '将', Component: ShogiGame },
   { id: 'go', name: '囲碁', blurb: '9・13・19路盤・置き碁も', icon: '碁', Component: GoGame },

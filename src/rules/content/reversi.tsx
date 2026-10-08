@@ -1,7 +1,7 @@
-import { OthelloDiagram, Row } from '../Diagrams';
+import { ReversiDiagram, Row } from '../Diagrams';
 import type { RulesContent } from '../types';
 
-export const othelloRules: RulesContent = {
+export const reversiRules: RulesContent = {
   beginner: (
     <>
       <h2>どんなゲーム？</h2>
@@ -12,7 +12,7 @@ export const othelloRules: RulesContent = {
 
       <h2>はじめの形</h2>
       <p>盤の中央に黒2つ・白2つを斜めに置いた形から始めます。<strong>先手は黒</strong>です。</p>
-      <OthelloDiagram
+      <ReversiDiagram
         caption="はじめの形。黒が置ける場所（点）は4か所"
         rows={['........', '........', '...*....', '..*WB...', '...BW*..', '....*...', '........', '........']}
       />
@@ -26,8 +26,8 @@ export const othelloRules: RulesContent = {
         <li>挟めるのに返さない、ということはできません。挟んだ石は全部返します。</li>
       </ol>
       <Row>
-        <OthelloDiagram caption="黒が上の点に置くと…" rows={['........', '...*....', '...WB...', '...BW...', '........']} />
-        <OthelloDiagram caption="挟まれた白（赤い枠）が黒になる" rows={['........', '...B....', '...bB...', '...BW...', '........']} />
+        <ReversiDiagram caption="黒が上の点に置くと…" rows={['........', '...*....', '...WB...', '...BW...', '........']} />
+        <ReversiDiagram caption="挟まれた白（赤い枠）が黒になる" rows={['........', '...B....', '...bB...', '...BW...', '........']} />
       </Row>
 
       <h2>パスと終わり方</h2>

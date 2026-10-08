@@ -2,7 +2,7 @@ import { Deadline, isAbort } from '../../core/search';
 import type { GameEngine, Level, Outcome, Player } from '../../core/types';
 
 /** 盤面: 0 = 空, 1 = 黒, 2 = 白 */
-export interface OthelloState {
+export interface ReversiState {
   board: number[];
   turn: Player;
   last: number;
@@ -11,7 +11,7 @@ export interface OthelloState {
   over: boolean;
 }
 
-export type OthelloMove = number;
+export type ReversiMove = number;
 
 const DIRS = [-9, -8, -7, -1, 1, 7, 8, 9];
 
@@ -61,7 +61,7 @@ export function movesFor(board: number[], color: number): number[] {
   return out;
 }
 
-export function legalMoves(s: OthelloState): number[] {
+export function legalMoves(s: ReversiState): number[] {
   return s.over ? [] : movesFor(s.board, s.turn + 1);
 }
 
@@ -82,7 +82,7 @@ export function count(board: number[]): [number, number] {
   return [b, w];
 }
 
-export const othello: GameEngine<OthelloState, OthelloMove> = {
+export const reversi: GameEngine<ReversiState, ReversiMove> = {
   initial() {
     const board = new Array(64).fill(0);
     board[27] = 2;
@@ -189,7 +189,7 @@ function searchRoot(board: number[], color: number, moves: number[], depth: numb
   return best;
 }
 
-export function chooseOthelloMove(s: OthelloState, level: Level, budgetMs?: number): OthelloMove {
+export function chooseReversiMove(s: ReversiState, level: Level, budgetMs?: number): ReversiMove {
   const color = s.turn + 1;
   const moves = legalMoves(s);
   if (moves.length === 1) return moves[0];

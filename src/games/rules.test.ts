@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { chess, claimableDraw } from './chess/engine';
 import { go, handicapPoints, score, type GoState } from './go/engine';
 import { gomoku, isForbidden, isLegal as gomokuLegal, SIZE } from './gomoku/engine';
-import { othello } from './othello/engine';
+import { reversi } from './reversi/engine';
 import {
   declaration, FU, HI, KA, legalMoves as shogiMoves, OU, shogi,
   type ShogiState,
@@ -79,13 +79,13 @@ describe('五目並べ（ルールガイドの図を含む）', () => {
   });
 });
 
-describe('オセロ', () => {
+describe('リバーシ', () => {
   it('空きマスは勝者に加算する', () => {
     const board = new Array(64).fill(0);
     for (let i = 0; i < 10; i++) board[i] = 1;
     board[20] = 2;
     board[21] = 2;
-    const out = othello.outcome({ board, turn: 0, last: -1, passed: null, over: true });
+    const out = reversi.outcome({ board, turn: 0, last: -1, passed: null, over: true });
     expect(out).toEqual({ winner: 0, reason: '62 対 2（空き52マスは勝者に加算）' });
   });
 });

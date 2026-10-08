@@ -3,14 +3,14 @@ import { Segmented } from '../components/GameShell';
 import { chessRules } from './content/chess';
 import { goRules } from './content/go';
 import { gomokuRules } from './content/gomoku';
-import { othelloRules } from './content/othello';
+import { reversiRules } from './content/reversi';
 import { shogiRules } from './content/shogi';
 import { TimeRules } from './TimeRules';
 import type { RulesContent } from './types';
 
 const CONTENT: Record<string, RulesContent> = {
   gomoku: gomokuRules,
-  othello: othelloRules,
+  reversi: reversiRules,
   chess: chessRules,
   shogi: shogiRules,
   go: goRules,

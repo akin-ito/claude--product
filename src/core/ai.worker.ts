@@ -2,13 +2,13 @@
 import { chooseChessMove } from '../games/chess/engine';
 import { chooseGoMove } from '../games/go/engine';
 import { chooseGomokuMove } from '../games/gomoku/engine';
-import { chooseOthelloMove } from '../games/othello/engine';
+import { chooseReversiMove } from '../games/reversi/engine';
 import { chooseShogiMove } from '../games/shogi/engine';
 import type { Level } from './types';
 
 const choosers: Record<string, (s: any, level: Level, budgetMs?: number) => unknown> = {
   gomoku: chooseGomokuMove,
-  othello: chooseOthelloMove,
+  reversi: chooseReversiMove,
   chess: chooseChessMove,
   shogi: chooseShogiMove,
   go: chooseGoMove,

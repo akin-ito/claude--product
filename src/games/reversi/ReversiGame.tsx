@@ -1,10 +1,10 @@
 import { GameShell } from '../../components/GameShell';
 import { TIME_PRESETS } from '../../core/timePresets';
 import { useGameSession } from '../../core/useGameSession';
-import { count, legalMoves, othello } from './engine';
+import { count, legalMoves, reversi } from './engine';
 
-export function OthelloGame({ onBack, onRules }: { onBack(): void; onRules(): void }) {
-  const session = useGameSession('othello', othello, { mode: 'cpu', humanSide: 0, level: 2, time: { kind: 'none' }, options: {} });
+export function ReversiGame({ onBack, onRules }: { onBack(): void; onRules(): void }) {
+  const session = useGameSession('reversi', reversi, { mode: 'cpu', humanSide: 0, level: 2, time: { kind: 'none' }, options: {} });
   const { state, canInput, play, outcome } = session;
   const hints = new Set(canInput ? legalMoves(state) : []);
   const [b, w] = count(state.board);
@@ -12,7 +12,7 @@ export function OthelloGame({ onBack, onRules }: { onBack(): void; onRules(): vo
 
   return (
     <GameShell
-      timePresets={TIME_PRESETS.othello} title="オセロ" sideNames={sideNames} turn={state.turn} session={session} onBack={onBack} onRules={onRules}>
+      timePresets={TIME_PRESETS.reversi} title="リバーシ" sideNames={sideNames} turn={state.turn} session={session} onBack={onBack} onRules={onRules}>
       {() => (
         <>
           <div className="scoreline">
@@ -23,7 +23,7 @@ export function OthelloGame({ onBack, onRules }: { onBack(): void; onRules(): vo
               <i className="disc disc-w" /> {w}
             </span>
           </div>
-          <div className="grid-board othello" role="grid" aria-label="オセロの盤">
+          <div className="grid-board reversi" role="grid" aria-label="リバーシの盤">
             {state.board.map((v, i) => (
               <button
                 key={i}

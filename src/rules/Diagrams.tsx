@@ -91,14 +91,14 @@ export function ShogiDiagram({ rows, caption }: { rows: string[]; caption?: Reac
 }
 
 /**
- * オセロの図。各行は文字の並び。
+ * リバーシの図。各行は文字の並び。
  *   B = 黒, W = 白, . = 空, * = 置ける場所, b / w = 今ひっくり返った石（強調）
  */
-export function OthelloDiagram({ rows, caption }: { rows: string[]; caption?: ReactNode }) {
+export function ReversiDiagram({ rows, caption }: { rows: string[]; caption?: ReactNode }) {
   const cols = rows[0].length;
   return (
     <Figure caption={caption}>
-      <div className="dg-grid dg-othello" style={gridStyle(cols, 34)}>
+      <div className="dg-grid dg-reversi" style={gridStyle(cols, 34)}>
         {rows.flatMap((row, r) =>
           [...row].map((ch, c) => (
             <div key={`${r}-${c}`} className="dg-cell">
