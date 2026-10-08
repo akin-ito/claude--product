@@ -97,7 +97,7 @@ describe('将棋', () => {
     p.board[2 * 9 + 4] = FU; // 5三
     p.board[80] = OU;
     p.hands[0][KI] = 1;
-    const s: ShogiState = { ...p, keys: ['x'], checks: [false], lastMove: null };
+    const s: ShogiState = { ...p, handicap: 'none', startTurn: 0, declared: null, keys: ['x'], checks: [false], lastMove: null };
     const next = shogi.apply(s, { from: -1, to: 13, drop: KI }); // 5二金
     expect(shogi.outcome(next)).toEqual({ winner: 0, reason: '詰み' });
   });
@@ -108,12 +108,12 @@ describe('将棋', () => {
     p.board[2 * 9 + 4] = FU;
     p.board[80] = OU;
     p.hands[0][KI] = 1;
-    const s: ShogiState = { ...p, keys: ['x'], checks: [false], lastMove: null };
+    const s: ShogiState = { ...p, handicap: 'none', startTurn: 0, declared: null, keys: ['x'], checks: [false], lastMove: null };
     expect(chooseShogiMove(s, 2)).toEqual({ from: -1, to: 13, drop: KI });
   });
 
   it('同一局面4回で千日手', () => {
-    let s = shogi.initial({});
+    let s = shogi.initial({ handicap: 'none' });
     const cycle = [
       { from: 70, to: 69, promote: false }, // 2八飛 → 3八
       { from: 10, to: 11, promote: false }, // 8二飛 → 7二
@@ -121,7 +121,7 @@ describe('将棋', () => {
       { from: 11, to: 10, promote: false },
     ];
     for (let k = 0; k < 3; k++) for (const m of cycle) s = shogi.apply(s, m);
-    expect(shogi.outcome(s)).toEqual({ winner: null, reason: '千日手' });
+    expect(shogi.outcome(s)).toEqual({ winner: null, reason: '千日手（指し直し）' });
   });
 });
 
@@ -144,7 +144,7 @@ describe('オセロ', () => {
 
 describe('五目並べ', () => {
   it('5 つ並ぶと勝ち', () => {
-    let s = gomoku.initial({});
+    let s = gomoku.initial({ rule: 'free' });
     for (let k = 0; k < 4; k++) {
       s = gomoku.apply(s, 7 * SIZE + k);
       s = gomoku.apply(s, 9 * SIZE + k);
@@ -155,7 +155,7 @@ describe('五目並べ', () => {
   });
 
   it('CPU は相手の四を止める', () => {
-    let s = gomoku.initial({});
+    let s = gomoku.initial({ rule: 'free' });
     const black = [7 * SIZE + 3, 7 * SIZE + 4, 7 * SIZE + 5, 7 * SIZE + 6];
     const white = [0, 2, 4];
     for (let k = 0; k < 3; k++) {
@@ -169,7 +169,7 @@ describe('五目並べ', () => {
 
 describe('囲碁', () => {
   it('コウ', () => {
-    let s = go.initial({ size: 9 });
+    let s = go.initial({ size: 9, handicap: 'even' });
     const play = (p: number) => (s = go.apply(s, { t: 'play', p }));
     // 典型的なコウの形
     //   . B W .
@@ -188,7 +188,7 @@ describe('囲碁', () => {
   });
 
   it('自殺手は打てない', () => {
-    let s = go.initial({ size: 9 });
+    let s = go.initial({ size: 9, handicap: 'even' });
     const play = (p: number) => (s = go.apply(s, { t: 'play', p }));
     play(1); play(40);
     play(9); // 白が 0 に打つと自殺手
@@ -196,7 +196,7 @@ describe('囲碁', () => {
   });
 
   it('パス 2 回で死石確認、確定で終局', () => {
-    let s = go.initial({ size: 9 });
+    let s = go.initial({ size: 9, handicap: 'even' });
     s = go.apply(s, { t: 'pass' });
     s = go.apply(s, { t: 'pass' });
     expect(s.phase).toBe('scoring');
@@ -206,7 +206,7 @@ describe('囲碁', () => {
   });
 
   it('CPU が手を返す', () => {
-    const s = go.initial({ size: 9 });
+    const s = go.initial({ size: 9, handicap: 'even' });
     const m = chooseGoMove(s, 1);
     expect(m.t === 'pass' || (m.t === 'play' && isLegalPlay(s, m.p))).toBe(true);
   });

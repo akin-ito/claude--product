@@ -103,9 +103,12 @@ export const othello: GameEngine<OthelloState, OthelloMove> = {
   outcome(s): Outcome | null {
     if (!s.over) return null;
     const [b, w] = count(s.board);
-    const reason = `${b} 対 ${w}`;
-    if (b === w) return { winner: null, reason };
-    return { winner: b > w ? 0 : 1, reason };
+    if (b === w) return { winner: null, reason: `${b} 対 ${w}` };
+    // 日本オセロ連盟の競技ルール: 空きマスは勝者の石数に加える
+    const empty = 64 - b - w;
+    const final = b > w ? `${b + empty} 対 ${w}` : `${b} 対 ${w + empty}`;
+    const note = empty ? `（空き${empty}マスは勝者に加算）` : '';
+    return { winner: b > w ? 0 : 1, reason: final + note };
   },
 };
 

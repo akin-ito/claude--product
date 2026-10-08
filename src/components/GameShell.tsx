@@ -27,10 +27,23 @@ interface Props<O> {
   /** 新規対局の設定に、ゲーム固有の項目を足す */
   renderOptions?: (options: O, set: (o: O) => void) => ReactNode;
   onBack(): void;
+  /** ルール説明を開く */
+  onRules(): void;
   children: (view: { flipped: boolean }) => ReactNode;
 }
 
-export function GameShell<O>({ title, sideNames, turn, session, flippable, whiteFirst, renderOptions, onBack, children }: Props<O>) {
+export function GameShell<O>({
+  title,
+  sideNames,
+  turn,
+  session,
+  flippable,
+  whiteFirst,
+  renderOptions,
+  onBack,
+  onRules,
+  children,
+}: Props<O>) {
   const { settings, outcome, thinking } = session;
   const [showSettings, setShowSettings] = useState(false);
   const [manualFlip, setManualFlip] = useState(false);
@@ -71,8 +84,8 @@ export function GameShell<O>({ title, sideNames, turn, session, flippable, white
           <h1>{title}</h1>
           <span className="mode">{modeLabel}</span>
         </div>
-        <button className="icon-btn" onClick={() => setShowSettings(true)} aria-label="新しい対局">
-          ＋
+        <button className="icon-btn small" onClick={onRules} aria-label="ルール">
+          ？
         </button>
       </header>
 
@@ -183,6 +196,26 @@ function SettingsSheet<O>({
         </div>
       </div>
     </div>
+  );
+}
+
+export function Select<T extends string>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T;
+  options: [T, string][];
+  onChange(v: T): void;
+}) {
+  return (
+    <select className="select" value={value} onChange={(e) => onChange(e.target.value as T)}>
+      {options.map(([v, label]) => (
+        <option key={v} value={v}>
+          {label}
+        </option>
+      ))}
+    </select>
   );
 }
 

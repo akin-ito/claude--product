@@ -19,7 +19,44 @@ export interface ShogiPos {
   turn: Player;
 }
 
+/** 駒落ちの種類。上手（後手の位置に座る側）の駒を落とす */
+export type Handicap = 'none' | 'lance' | 'bishop' | 'rook' | 'rook-lance' | 'two' | 'four' | 'six' | 'eight';
+
+export const HANDICAPS: { id: Handicap; name: string }[] = [
+  { id: 'none', name: '平手' },
+  { id: 'lance', name: '香落ち' },
+  { id: 'bishop', name: '角落ち' },
+  { id: 'rook', name: '飛車落ち' },
+  { id: 'rook-lance', name: '飛香落ち' },
+  { id: 'two', name: '二枚落ち' },
+  { id: 'four', name: '四枚落ち' },
+  { id: 'six', name: '六枚落ち' },
+  { id: 'eight', name: '八枚落ち' },
+];
+
+/** 上手から取り除くマス（row 0〜1 の index） */
+const HANDICAP_SQUARES: Record<Handicap, number[]> = {
+  none: [],
+  lance: [8], // 1一香
+  bishop: [16], // 2二角
+  rook: [10], // 8二飛
+  'rook-lance': [10, 8],
+  two: [10, 16],
+  four: [10, 16, 0, 8],
+  six: [10, 16, 0, 8, 1, 7],
+  eight: [10, 16, 0, 8, 1, 7, 2, 6],
+};
+
+export interface ShogiOptions {
+  handicap: Handicap;
+}
+
 export interface ShogiState extends ShogiPos {
+  handicap: Handicap;
+  /** 最初に指した手番（駒落ちは上手 = 1 から指す） */
+  startTurn: Player;
+  /** 入玉宣言が成立した手番 */
+  declared: Player | null;
   /** 千日手判定用のキー（初期局面から順に） */
   keys: string[];
   /** 各局面に至った手が王手だったか */
@@ -83,7 +120,7 @@ function deadEnd(type: number, p: Player, r: number): boolean {
 
 const BACK = [KY, KE, GI, KI, OU, KI, GI, KE, KY];
 
-export function initialPos(): ShogiPos {
+export function initialPos(handicap: Handicap = 'none'): ShogiPos {
   const board = new Array(81).fill(0);
   for (let c = 0; c < 9; c++) {
     board[c] = -BACK[c];
@@ -95,7 +132,8 @@ export function initialPos(): ShogiPos {
   board[1 * 9 + 7] = -KA;
   board[7 * 9 + 1] = KA;
   board[7 * 9 + 7] = HI;
-  return { board, hands: [new Array(8).fill(0), new Array(8).fill(0)], turn: 0 };
+  for (const sq of HANDICAP_SQUARES[handicap]) board[sq] = 0;
+  return { board, hands: [new Array(8).fill(0), new Array(8).fill(0)], turn: handicap === 'none' ? 0 : 1 };
 }
 
 function positionKey(p: ShogiPos): string {
@@ -241,30 +279,93 @@ function repetition(s: ShogiState): Outcome | null {
   const idx: number[] = [];
   for (let i = 0; i <= n; i++) if (s.keys[i] === last) idx.push(i);
   if (idx.length < 4) return null;
-  // 局面 j に至る手を指したのは (j + 1) % 2 の手番
+  // 局面 j に至る手を指したのは (startTurn + j - 1) % 2 の手番
   const first = idx[0];
   for (const p of [0, 1] as Player[]) {
     let moves = 0;
     let allCheck = true;
     for (let j = first + 1; j <= n; j++) {
-      if ((j + 1) % 2 !== p) continue;
+      if ((s.startTurn + j - 1) % 2 !== p) continue;
       moves++;
       if (!s.checks[j]) allCheck = false;
     }
     if (moves > 0 && allCheck) return { winner: p === 0 ? 1 : 0, reason: '連続王手の千日手' };
   }
-  return { winner: null, reason: '千日手' };
+  return { winner: null, reason: '千日手（指し直し）' };
 }
 
-export const shogi: GameEngine<ShogiState, ShogiMove> = {
-  initial() {
-    const pos = initialPos();
-    return { ...pos, keys: [positionKey(pos)], checks: [false], lastMove: null };
+// ---------------------------------------------------------------- 入玉宣言（27点法）
+
+const BIG_PIECES = new Set([KA, HI, UM, RY]);
+const piecePoints = (t: number) => (t === OU ? 0 : BIG_PIECES.has(t) ? 5 : 1);
+
+export interface Declaration {
+  /** 宣言の条件をすべて満たしているか */
+  ok: boolean;
+  kingInCamp: boolean;
+  /** 敵陣にある玉以外の駒の枚数（10枚以上必要） */
+  piecesInCamp: number;
+  /** 点数（駒落ちの上手は落とした駒の点数を含む） */
+  points: number;
+  /** 必要な点数（先手・下手 28点、後手・上手 27点） */
+  required: number;
+  inCheck: boolean;
+}
+
+/** 手番側が入玉宣言（27点法）できるか */
+export function declaration(s: ShogiState): Declaration {
+  const p = s.turn;
+  const sg = sign(p);
+  const enemyCamp = (r: number) => (p === 0 ? r <= 2 : r >= 6);
+  let kingInCamp = false;
+  let piecesInCamp = 0;
+  let points = 0;
+  for (let i = 0; i < 81; i++) {
+    const v = s.board[i];
+    if (v === 0 || owner(v) !== p || !enemyCamp(Math.floor(i / 9))) continue;
+    if (v === sg * OU) kingInCamp = true;
+    else {
+      piecesInCamp++;
+      points += piecePoints(Math.abs(v));
+    }
+  }
+  for (let t = FU; t <= HI; t++) points += s.hands[p][t] * piecePoints(t);
+  // 駒落ちでは、落とした駒の点数を上手に加える
+  if (p === 1) for (const sq of HANDICAP_SQUARES[s.handicap]) points += piecePoints(Math.abs(initialPos().board[sq]));
+  const required = p === 0 ? 28 : 27;
+  const check = inCheck(s);
+  return {
+    ok: kingInCamp && piecesInCamp >= 10 && points >= required && !check,
+    kingInCamp,
+    piecesInCamp,
+    points,
+    required,
+    inCheck: check,
+  };
+}
+
+/** 盤上の手、または入玉宣言 */
+export type ShogiAction = ShogiMove | { declare: true };
+
+export const shogi: GameEngine<ShogiState, ShogiAction, ShogiOptions> = {
+  initial({ handicap }) {
+    const pos = initialPos(handicap);
+    return {
+      ...pos,
+      handicap,
+      startTurn: pos.turn,
+      declared: null,
+      keys: [positionKey(pos)],
+      checks: [false],
+      lastMove: null,
+    };
   },
   turn: (s) => s.turn,
   apply(s, m) {
+    if ('declare' in m) return declaration(s).ok ? { ...s, declared: s.turn } : s;
     const pos = makeMove(s, m);
     return {
+      ...s,
       ...pos,
       keys: [...s.keys, positionKey(pos)],
       checks: [...s.checks, inCheck(pos)],
@@ -272,6 +373,7 @@ export const shogi: GameEngine<ShogiState, ShogiMove> = {
     };
   },
   outcome(s): Outcome | null {
+    if (s.declared !== null) return { winner: s.declared, reason: '入玉宣言' };
     const rep = repetition(s);
     if (rep) return rep;
     if (legalMoves(s).length === 0) return { winner: s.turn === 0 ? 1 : 0, reason: '詰み' };
@@ -374,7 +476,8 @@ function search(p: ShogiPos, depth: number, alpha: number, beta: number, ply: nu
   return best;
 }
 
-export function chooseShogiMove(s: ShogiState, level: Level): ShogiMove {
+export function chooseShogiMove(s: ShogiState, level: Level): ShogiAction {
+  if (declaration(s).ok) return { declare: true };
   // 同じ評価の手が並んだとき、毎回同じ手にならないよう先に混ぜておく
   const moves = orderMoves(s, shuffle(legalMoves(s)));
   if (moves.length === 1) return moves[0];

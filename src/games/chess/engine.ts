@@ -20,6 +20,8 @@ export interface ChessState extends ChessPos {
   /** 同一局面判定用のキー（初期局面から順に） */
   keys: string[];
   lastMove: ChessMove | null;
+  /** 引き分けを申請して認められた理由 */
+  claimed: string | null;
 }
 
 export type Promo = 'q' | 'r' | 'b' | 'n';
@@ -29,6 +31,9 @@ export interface ChessMove {
   to: number;
   promo?: Promo;
 }
+
+/** 駒を動かす手、または引き分けの申請 */
+export type ChessAction = ChessMove | { claim: true };
 
 const isWhite = (p: string) => p !== '' && p <= 'Z';
 const ownedBy = (p: string, player: Player) => p !== '' && isWhite(p) === (player === 0);
@@ -60,13 +65,30 @@ export function fromFEN(fen: string): ChessState {
     ep: epSq,
     halfmove: Number(half ?? 0),
   };
-  return { ...pos, keys: [positionKey(pos)], lastMove: null };
+  return { ...pos, keys: [positionKey(pos)], lastMove: null, claimed: null };
 }
 
 export const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
+/**
+ * 同一局面の判定用キー。FIDE の規定どおり、アンパッサンの権利は
+ * 実際にアンパッサンが指せる場合だけ局面の違いとして扱う。
+ */
 function positionKey(p: ChessPos): string {
-  return p.board.map((x) => x || '.').join('') + p.turn + p.castling + p.ep;
+  const epMatters = p.ep >= 0 && legalMoves(p).some((m) => m.to === p.ep && p.board[m.from].toUpperCase() === 'P');
+  return p.board.map((x) => x || '.').join('') + p.turn + p.castling + (epMatters ? p.ep : -1);
+}
+
+const repetitions = (s: ChessState) => {
+  const last = s.keys[s.keys.length - 1];
+  return s.keys.filter((k) => k === last).length;
+};
+
+/** 手番側が申請できる引き分け（3回同形・50手ルール）。なければ null */
+export function claimableDraw(s: ChessState): string | null {
+  if (repetitions(s) >= 3) return '同一局面3回';
+  if (s.halfmove >= 100) return '50手ルール';
+  return null;
 }
 
 /** sq が byWhite 側の駒に利かされているか */
@@ -277,22 +299,24 @@ function insufficientMaterial(board: string[]): boolean {
   return false;
 }
 
-export const chess: GameEngine<ChessState, ChessMove> = {
+export const chess: GameEngine<ChessState, ChessAction> = {
   initial: () => fromFEN(START_FEN),
   turn: (s) => s.turn,
   apply(s, m) {
+    if ('claim' in m) return { ...s, claimed: claimableDraw(s) };
     const pos = makeMove(s, m);
-    return { ...pos, keys: [...s.keys, positionKey(pos)], lastMove: m };
+    return { ...pos, keys: [...s.keys, positionKey(pos)], lastMove: m, claimed: null };
   },
   outcome(s): Outcome | null {
+    if (s.claimed) return { winner: null, reason: `${s.claimed}（申請）` };
     if (legalMoves(s).length === 0) {
       if (inCheck(s)) return { winner: s.turn === 0 ? 1 : 0, reason: 'チェックメイト' };
       return { winner: null, reason: 'ステイルメイト' };
     }
-    if (insufficientMaterial(s.board)) return { winner: null, reason: '駒不足' };
-    if (s.halfmove >= 100) return { winner: null, reason: '50手ルール' };
-    const last = s.keys[s.keys.length - 1];
-    if (s.keys.filter((k) => k === last).length >= 3) return { winner: null, reason: '同一局面3回' };
+    if (insufficientMaterial(s.board)) return { winner: null, reason: 'デッドポジション（駒不足）' };
+    // 5回同形と75手ルールは申請なしで自動的に引き分け
+    if (repetitions(s) >= 5) return { winner: null, reason: '同一局面5回' };
+    if (s.halfmove >= 150) return { winner: null, reason: '75手ルール' };
     return null;
   },
 };
@@ -428,10 +452,11 @@ function search(p: ChessPos, depth: number, alpha: number, beta: number, ply: nu
   return best;
 }
 
-export function chooseChessMove(s: ChessState, level: Level): ChessMove {
+export function chooseChessMove(s: ChessState, level: Level): ChessAction {
   // 同じ評価の手が並んだとき、毎回同じ手にならないよう先に混ぜておく
   const moves = sortMoves(s, shuffle(legalMoves(s)));
   if (moves.length === 1) return moves[0];
+  const claimable = level >= 2 && claimableDraw(s) !== null;
 
   if (level === 1) {
     // 弱い: 1 手読み + ゆらぎ
@@ -451,6 +476,7 @@ export function chooseChessMove(s: ChessState, level: Level): ChessMove {
   const deadline = new Deadline(level === 2 ? 1500 : 3000);
   let ordered = moves;
   let best = moves[0];
+  let bestScore = 0;
   try {
     for (let d = 1; d <= maxDepth; d++) {
       let alpha = -Infinity;
@@ -463,11 +489,14 @@ export function chooseChessMove(s: ChessState, level: Level): ChessMove {
         }
       }
       best = iterBest;
+      bestScore = alpha;
       ordered = [best, ...ordered.filter((m) => m !== best)];
       if (alpha >= MATE - 100) break;
     }
   } catch (e) {
     if (!isAbort(e)) throw e;
   }
+  // 形勢が悪いなら、申請できる引き分けを取る
+  if (claimable && bestScore < -50) return { claim: true };
   return best;
 }

@@ -2,7 +2,7 @@ import { GameShell } from '../../components/GameShell';
 import { useGameSession } from '../../core/useGameSession';
 import { count, legalMoves, othello } from './engine';
 
-export function OthelloGame({ onBack }: { onBack(): void }) {
+export function OthelloGame({ onBack, onRules }: { onBack(): void; onRules(): void }) {
   const session = useGameSession('othello', othello, { mode: 'cpu', humanSide: 0, level: 2, options: {} });
   const { state, canInput, play, outcome } = session;
   const hints = new Set(canInput ? legalMoves(state) : []);
@@ -10,7 +10,7 @@ export function OthelloGame({ onBack }: { onBack(): void }) {
   const sideNames: [string, string] = ['黒', '白'];
 
   return (
-    <GameShell title="オセロ" sideNames={sideNames} turn={state.turn} session={session} onBack={onBack}>
+    <GameShell title="オセロ" sideNames={sideNames} turn={state.turn} session={session} onBack={onBack} onRules={onRules}>
       {() => (
         <>
           <div className="scoreline">

@@ -1,7 +1,7 @@
-import { GameShell, Segmented, useConfirmTap } from '../../components/GameShell';
+import { GameShell, Segmented, Select, useConfirmTap } from '../../components/GameShell';
 import { IntersectionBoard, Stone } from '../../components/IntersectionBoard';
 import { useGameSession } from '../../core/useGameSession';
-import { go, isLegalPlay, score, type GoMove, type GoOptions, type GoState } from './engine';
+import { go, isLegalPlay, maxHandicap, score, type GoMove, type GoOptions, type GoState } from './engine';
 
 function starPoints(size: number): number[] {
   const at = (r: number, c: number) => r * size + c;
@@ -12,12 +12,21 @@ function starPoints(size: number): number[] {
   return out;
 }
 
-export function GoGame({ onBack }: { onBack(): void }) {
+function handicapOptions(size: number): [string, string][] {
+  const out: [string, string][] = [
+    ['even', '互先（黒番・コミ6目半）'],
+    ['sente', '定先（黒番・コミなし）'],
+  ];
+  for (let k = 2; k <= maxHandicap(size); k++) out.push([String(k), `${k}子局（置き碁・コミなし）`]);
+  return out;
+}
+
+export function GoGame({ onBack, onRules }: { onBack(): void; onRules(): void }) {
   const session = useGameSession<GoState, GoMove, GoOptions>('go', go, {
     mode: 'cpu',
     humanSide: 0,
     level: 2,
-    options: { size: 9 },
+    options: { size: 9, handicap: 'even' },
   });
   const { state, canInput, play } = session;
   const { size } = state;
@@ -42,19 +51,34 @@ export function GoGame({ onBack }: { onBack(): void }) {
       turn={state.turn}
       session={session}
       onBack={onBack}
+      onRules={onRules}
       renderOptions={(o, set) => (
-        <fieldset>
-          <legend>盤の大きさ</legend>
-          <Segmented
-            value={String(o.size)}
-            options={[
-              ['9', '9路'],
-              ['13', '13路'],
-              ['19', '19路'],
-            ]}
-            onChange={(v) => set({ ...o, size: Number(v) })}
-          />
-        </fieldset>
+        <>
+          <fieldset>
+            <legend>盤の大きさ</legend>
+            <Segmented
+              value={String(o.size)}
+              options={[
+                ['9', '9路'],
+                ['13', '13路'],
+                ['19', '19路'],
+              ]}
+              onChange={(v) => {
+                const size = Number(v);
+                const handicap = typeof o.handicap === 'number' ? Math.min(o.handicap, maxHandicap(size)) : o.handicap;
+                set({ size, handicap });
+              }}
+            />
+          </fieldset>
+          <fieldset>
+            <legend>手合い（置き碁は白が先に打ちます）</legend>
+            <Select
+              value={String(o.handicap)}
+              options={handicapOptions(o.size)}
+              onChange={(v) => set({ ...o, handicap: v === 'even' || v === 'sente' ? v : Number(v) })}
+            />
+          </fieldset>
+        </>
       )}
     >
       {() => (
@@ -62,7 +86,7 @@ export function GoGame({ onBack }: { onBack(): void }) {
           <div className="scoreline">
             <span>黒アゲハマ {state.captures[0]}</span>
             <span>白アゲハマ {state.captures[1]}</span>
-            <span>コミ {state.komi}</span>
+            <span>{state.handicap ? `${state.handicap}子局` : `コミ ${state.komi}`}</span>
           </div>
           <IntersectionBoard size={size} stars={starPoints(size)} label="碁盤" onTap={canInput ? onTap : undefined}>
             {sc &&

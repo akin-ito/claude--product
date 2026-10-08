@@ -1,8 +1,20 @@
 import { useState } from 'react';
-import { GameShell } from '../../components/GameShell';
+import { GameShell, Select } from '../../components/GameShell';
 import type { Player } from '../../core/types';
 import { useGameSession } from '../../core/useGameSession';
-import { HI, inCheck, legalMoves, shogi, type ShogiMove, type ShogiState } from './engine';
+import {
+  declaration,
+  HANDICAPS,
+  HI,
+  inCheck,
+  legalMoves,
+  shogi,
+  type Handicap,
+  type ShogiAction,
+  type ShogiMove,
+  type ShogiOptions,
+  type ShogiState,
+} from './engine';
 
 const NAMES: Record<number, string> = {
   1: '歩', 2: '香', 3: '桂', 4: '銀', 5: '金', 6: '角', 7: '飛', 8: '玉',
@@ -14,8 +26,13 @@ const KANJI_NUM = ['一', '二', '三', '四', '五', '六', '七', '八', '九'
 
 type Selection = { kind: 'board'; sq: number } | { kind: 'hand'; type: number };
 
-export function ShogiGame({ onBack }: { onBack(): void }) {
-  const session = useGameSession('shogi', shogi, { mode: 'cpu', humanSide: 0, level: 2, options: {} });
+export function ShogiGame({ onBack, onRules }: { onBack(): void; onRules(): void }) {
+  const session = useGameSession<ShogiState, ShogiAction, ShogiOptions>('shogi', shogi, {
+    mode: 'cpu',
+    humanSide: 0,
+    level: 2,
+    options: { handicap: 'none' },
+  });
   const { state, canInput, play, outcome } = session;
   const [sel, setSel] = useState<{ key: unknown; s: Selection } | null>(null);
   const [choice, setChoice] = useState<{ key: unknown; moves: ShogiMove[] } | null>(null);
@@ -50,9 +67,31 @@ export function ShogiGame({ onBack }: { onBack(): void }) {
   };
 
   const last = state.lastMove;
+  // 駒落ちでは上手（後手の位置）・下手（先手の位置）と呼ぶ
+  const sideNames: [string, string] = state.handicap === 'none' ? ['先手', '後手'] : ['下手', '上手'];
+  const decl = canInput ? declaration(state) : null;
+  const handicapName = HANDICAPS.find((h) => h.id === state.handicap)!.name;
 
   return (
-    <GameShell title="将棋" sideNames={['先手', '後手']} turn={state.turn} session={session} flippable onBack={onBack}>
+    <GameShell
+      title="将棋"
+      sideNames={sideNames}
+      turn={state.turn}
+      session={session}
+      flippable
+      onBack={onBack}
+      onRules={onRules}
+      renderOptions={(o, set) => (
+        <fieldset>
+          <legend>手合い（駒落ちは上手が先に指します）</legend>
+          <Select
+            value={o.handicap}
+            options={HANDICAPS.map((h) => [h.id, h.name] as [Handicap, string])}
+            onChange={(handicap) => set({ ...o, handicap })}
+          />
+        </fieldset>
+      )}
+    >
       {({ flipped }) => {
         const top: Player = flipped ? 0 : 1;
         const bottom: Player = flipped ? 1 : 0;
@@ -62,7 +101,8 @@ export function ShogiGame({ onBack }: { onBack(): void }) {
         const rows = flipped ? [...KANJI_NUM].reverse() : KANJI_NUM;
         return (
           <>
-            <Hand state={state} player={top} flipped={flipped} selected={selected} onTap={tapHand} />
+            {state.handicap !== 'none' && <div className="scoreline">{handicapName}</div>}
+            <Hand state={state} player={top} names={sideNames} flipped={flipped} selected={selected} onTap={tapHand} />
             <div className="shogi-wrap">
               <div className="shogi-cols">
                 {cols.map((c) => (
@@ -100,8 +140,19 @@ export function ShogiGame({ onBack }: { onBack(): void }) {
                 </div>
               </div>
             </div>
-            <Hand state={state} player={bottom} flipped={flipped} selected={selected} onTap={tapHand} />
+            <Hand state={state} player={bottom} names={sideNames} flipped={flipped} selected={selected} onTap={tapHand} />
             <p className="hint">{!outcome && inCheck(state) ? '王手！' : ' '}</p>
+            {decl?.kingInCamp && (
+              <div className="inline-actions">
+                <span className="note">
+                  入玉宣言（27点法）：{decl.points}/{decl.required}点・敵陣の駒 {decl.piecesInCamp}/10枚
+                  {decl.inCheck ? '・王手中は不可' : ''}
+                </span>
+                <button onClick={() => play({ declare: true })} disabled={!decl.ok}>
+                  入玉宣言
+                </button>
+              </div>
+            )}
             {promoChoice && (
               <div className="sheet-backdrop" onClick={() => setChoice(null)}>
                 <div className="sheet compact" role="dialog" aria-label="成りますか" onClick={(e) => e.stopPropagation()}>
@@ -138,12 +189,14 @@ export function ShogiGame({ onBack }: { onBack(): void }) {
 function Hand({
   state,
   player,
+  names,
   flipped,
   selected,
   onTap,
 }: {
   state: ShogiState;
   player: Player;
+  names: [string, string];
   flipped: boolean;
   selected: Selection | null;
   onTap(player: Player, type: number): void;
@@ -152,7 +205,7 @@ function Hand({
   const upsideDown = (player === 1) !== flipped;
   return (
     <div className={`hand${upsideDown ? ' hand-top' : ''}${state.turn === player ? ' active' : ''}`}>
-      <span className="hand-label">{player === 0 ? '☗先手' : '☖後手'}</span>
+      <span className="hand-label">{player === 0 ? `☗${names[0]}` : `☖${names[1]}`}</span>
       {pieces.length === 0 && <span className="hand-empty">持ち駒なし</span>}
       {pieces.map((t) => (
         <button

@@ -4,25 +4,41 @@ import { GoGame } from './games/go/GoGame';
 import { GomokuGame } from './games/gomoku/GomokuGame';
 import { OthelloGame } from './games/othello/OthelloGame';
 import { ShogiGame } from './games/shogi/ShogiGame';
+import { RulesPage } from './rules/RulesPage';
 
 interface GameInfo {
   id: string;
   name: string;
   blurb: string;
   icon: string;
-  Component: ComponentType<{ onBack(): void }>;
+  Component: ComponentType<{ onBack(): void; onRules(): void }>;
 }
 
 const GAMES: GameInfo[] = [
-  { id: 'gomoku', name: '五目並べ', blurb: '5つ並べたら勝ち', icon: '●', Component: GomokuGame },
+  { id: 'gomoku', name: '五目並べ', blurb: '5つ並べたら勝ち・連珠にも対応', icon: '●', Component: GomokuGame },
   { id: 'othello', name: 'オセロ', blurb: '挟んでひっくり返す', icon: '◐', Component: OthelloGame },
   { id: 'chess', name: 'チェス', blurb: 'キングを追い詰める', icon: '♞︎', Component: ChessGame },
-  { id: 'shogi', name: '将棋', blurb: '取った駒を使える', icon: '将', Component: ShogiGame },
-  { id: 'go', name: '囲碁', blurb: '9・13・19路盤', icon: '碁', Component: GoGame },
+  { id: 'shogi', name: '将棋', blurb: '取った駒を使える・駒落ちも', icon: '将', Component: ShogiGame },
+  { id: 'go', name: '囲碁', blurb: '9・13・19路盤・置き碁も', icon: '碁', Component: GoGame },
 ];
 
 function currentRoute(): string {
   return location.hash.replace(/^#\/?/, '');
+}
+
+/** アプリ内の画面遷移。戻るボタンで前の画面に戻れるよう履歴に積む */
+function navigate(path: string) {
+  history.pushState({ inApp: true }, '', `#/${path}`);
+  window.dispatchEvent(new HashChangeEvent('hashchange'));
+}
+
+/** 前の画面がアプリ内なら戻る。直接開いた場合は fallback へ */
+function goBack(fallback: string) {
+  if (history.state?.inApp) history.back();
+  else {
+    history.replaceState(null, '', `#/${fallback}`);
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+  }
 }
 
 export function App() {
@@ -30,16 +46,31 @@ export function App() {
   useEffect(() => {
     const onHash = () => setRoute(currentRoute());
     window.addEventListener('hashchange', onHash);
-    return () => window.removeEventListener('hashchange', onHash);
+    window.addEventListener('popstate', onHash);
+    return () => {
+      window.removeEventListener('hashchange', onHash);
+      window.removeEventListener('popstate', onHash);
+    };
   }, []);
 
-  const game = GAMES.find((g) => g.id === route);
+  const [section, id] = route.split('/');
+  if (section === 'rules') {
+    const game = GAMES.find((g) => g.id === id);
+    if (game)
+      return (
+        <RulesPage
+          key={game.id}
+          gameId={game.id}
+          name={game.name}
+          onBack={() => goBack('')}
+          onPlay={() => navigate(game.id)}
+        />
+      );
+  }
+
+  const game = GAMES.find((g) => g.id === section);
   if (game) {
-    const back = () => {
-      if (history.length > 1 && history.state?.fromMenu) history.back();
-      else location.hash = '';
-    };
-    return <game.Component key={game.id} onBack={back} />;
+    return <game.Component key={game.id} onBack={() => goBack('')} onRules={() => navigate(`rules/${game.id}`)} />;
   }
 
   return (
@@ -50,14 +81,13 @@ export function App() {
       </header>
       <ul className="game-list">
         {GAMES.map((g) => (
-          <li key={g.id}>
+          <li key={g.id} className={`game-card card-${g.id}`}>
             <a
-              className={`game-card card-${g.id}`}
+              className="game-main"
               href={`#/${g.id}`}
               onClick={(e) => {
                 e.preventDefault();
-                history.pushState({ fromMenu: true }, '', `#/${g.id}`);
-                setRoute(g.id);
+                navigate(g.id);
               }}
             >
               <span className="game-icon" aria-hidden>
@@ -67,9 +97,16 @@ export function App() {
                 <strong>{g.name}</strong>
                 <small>{g.blurb}</small>
               </span>
-              <span className="chev" aria-hidden>
-                ›
-              </span>
+            </a>
+            <a
+              className="rules-link"
+              href={`#/rules/${g.id}`}
+              onClick={(e) => {
+                e.preventDefault();
+                navigate(`rules/${g.id}`);
+              }}
+            >
+              ルール
             </a>
           </li>
         ))}

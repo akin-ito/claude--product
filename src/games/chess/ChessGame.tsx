@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { GameShell } from '../../components/GameShell';
 import { useGameSession } from '../../core/useGameSession';
-import { chess, inCheck, legalMoves, type ChessMove, type Promo } from './engine';
+import { chess, claimableDraw, inCheck, legalMoves, type ChessMove, type Promo } from './engine';
 
 // 白も黒も塗りつぶしの字形を使い、色は CSS で付ける（︎ で絵文字表示を防ぐ）
 const GLYPH: Record<string, string> = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟' };
 const glyph = (p: string) => GLYPH[p.toUpperCase()] + '︎';
 const PROMOS: Promo[] = ['q', 'r', 'b', 'n'];
 
-export function ChessGame({ onBack }: { onBack(): void }) {
+export function ChessGame({ onBack, onRules }: { onBack(): void; onRules(): void }) {
   const session = useGameSession('chess', chess, { mode: 'cpu', humanSide: 0, level: 2, options: {} });
   const { state, canInput, play, outcome } = session;
   const [sel, setSel] = useState<{ key: unknown; sq: number } | null>(null);
@@ -17,6 +17,7 @@ export function ChessGame({ onBack }: { onBack(): void }) {
   const promoMoves = promo && promo.key === state ? promo.moves : null;
 
   const moves = canInput ? legalMoves(state) : [];
+  const claim = claimableDraw(state);
   const targets = new Map<number, ChessMove[]>();
   for (const m of moves) if (m.from === selected) targets.set(m.to, [...(targets.get(m.to) ?? []), m]);
   const movable = new Set(moves.map((m) => m.from));
@@ -35,7 +36,7 @@ export function ChessGame({ onBack }: { onBack(): void }) {
   };
 
   return (
-    <GameShell title="チェス" sideNames={['白', '黒']} turn={state.turn} session={session} flippable whiteFirst onBack={onBack}>
+    <GameShell title="チェス" sideNames={['白', '黒']} turn={state.turn} session={session} flippable whiteFirst onBack={onBack} onRules={onRules}>
       {({ flipped }) => {
         const order = [...Array(64).keys()];
         if (flipped) order.reverse();
@@ -62,6 +63,11 @@ export function ChessGame({ onBack }: { onBack(): void }) {
               })}
             </div>
             <p className="hint">{!outcome && inCheck(state) ? 'チェック！' : ' '}</p>
+            {canInput && claim && (
+              <div className="inline-actions">
+                <button onClick={() => play({ claim: true })}>引き分けを申請（{claim}）</button>
+              </div>
+            )}
             {promoMoves && (
               <div className="sheet-backdrop" onClick={() => setPromo(null)}>
                 <div className="sheet compact" role="dialog" aria-label="昇格する駒" onClick={(e) => e.stopPropagation()}>

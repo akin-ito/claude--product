@@ -17,7 +17,7 @@ interface Session<S, O> {
 }
 
 /** 保存形式を変えたら上げる。古い保存データは読み捨てる */
-const STORAGE_VERSION = 1;
+const STORAGE_VERSION = 2;
 
 function load<S, O>(key: string): Session<S, O> | null {
   try {

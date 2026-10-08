@@ -96,8 +96,8 @@ button {
 .game-card {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
+  gap: 8px;
+  padding: 0 12px 0 0;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 16px;
@@ -107,8 +107,29 @@ button {
   transition: transform 0.1s;
 }
 
-.game-card:active {
-  transform: scale(0.98);
+.game-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 0 14px 16px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.game-main:active {
+  opacity: 0.7;
+}
+
+.rules-link {
+  flex: none;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
 }
 
 .game-icon {
@@ -163,10 +184,6 @@ button {
   font-size: 13px;
 }
 
-.chev {
-  color: var(--muted);
-  font-size: 28px;
-}
 
 .menu-foot {
   margin-top: 20px;
@@ -786,4 +803,252 @@ button:disabled {
   fill: #fafafa;
   stroke: #555;
   stroke-width: 0.03;
+}
+
+.icon-btn.small {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.select {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+}
+
+.forbid {
+  stroke: #d33;
+  stroke-width: 0.08;
+  stroke-linecap: round;
+}
+
+.inline-actions .note {
+  flex: 2;
+  font-size: 12px;
+  color: var(--muted);
+  align-self: center;
+}
+
+/* ------------------------------------------------------------ ルール */
+
+.rules {
+  max-width: 680px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  padding: env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 16px);
+}
+
+.rules-topbar {
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  z-index: 2;
+}
+
+.icon-btn-spacer {
+  width: 44px;
+  flex: none;
+}
+
+.rules-tabs {
+  position: sticky;
+  top: 60px;
+  z-index: 2;
+  background: var(--bg);
+  padding: 0 16px 8px;
+}
+
+.rules-body {
+  padding: 0 16px;
+  line-height: 1.8;
+  font-size: 15px;
+}
+
+.rules-body h2 {
+  margin: 28px 0 8px;
+  font-size: 19px;
+  padding-bottom: 4px;
+  border-bottom: 2px solid var(--line);
+}
+
+.rules-body h3 {
+  margin: 20px 0 4px;
+  font-size: 16px;
+}
+
+.rules-body p,
+.rules-body ul,
+.rules-body ol {
+  margin: 6px 0;
+}
+
+.rules-body ul,
+.rules-body ol {
+  padding-left: 1.4em;
+}
+
+.rules-body li {
+  margin: 4px 0;
+}
+
+.rules-body dl {
+  margin: 8px 0;
+}
+
+.rules-body dt {
+  font-weight: 700;
+  margin-top: 10px;
+}
+
+.rules-body dd {
+  margin: 2px 0 0 1em;
+}
+
+.rules-body .lead {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 12px;
+}
+
+.rules-foot {
+  display: flex;
+  gap: 8px;
+  padding: 24px 16px 8px;
+}
+
+.rules-foot button {
+  flex: 1;
+  min-height: 48px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-weight: 600;
+}
+
+/* 図 */
+.dg-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+}
+
+.diagram {
+  margin: 12px auto;
+  max-width: 300px;
+  flex: 0 1 auto;
+  min-width: 96px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.diagram figcaption {
+  max-width: 220px;
+  margin-top: 6px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+  text-align: center;
+}
+
+.dg-grid {
+  display: grid;
+  max-width: 300px;
+}
+
+.dg-grid .dg-cell {
+  position: relative;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  container-type: inline-size;
+}
+
+.dg-chess .dg-cell.light {
+  background: var(--sq-light);
+}
+.dg-chess .dg-cell.dark {
+  background: var(--sq-dark);
+}
+.dg-chess .chess-piece {
+  font-size: 78cqw;
+}
+
+.dg-shogi {
+  gap: 1px;
+  background: var(--wood-line);
+  border: 1px solid var(--wood-line);
+}
+.dg-shogi .dg-cell {
+  background: #e9c98e;
+}
+.dg-shogi .koma {
+  font-size: 50cqw;
+}
+
+.dg-othello {
+  gap: 1px;
+  background: var(--felt-line);
+  border: 1px solid var(--felt-line);
+}
+.dg-othello .dg-cell {
+  background: var(--felt);
+}
+.dg-othello .disc.flipped {
+  box-shadow: 0 0 0 2px #e94b3c;
+}
+
+.dg-grid .dg-cell.mark::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(230, 40, 40, 0.38);
+}
+
+.dg-dot {
+  width: 30%;
+  height: 30%;
+  border-radius: 50%;
+  background: #e94b3c;
+}
+
+.dg-dot.slide {
+  background: transparent;
+  border: 2px solid #e94b3c;
+}
+
+.dg-points {
+  max-width: 300px;
+  display: block;
+  border-radius: 4px;
+}
+
+.dg-pt {
+  fill: #e94b3c;
+}
+
+.dg-tri.on-b {
+  fill: #fff;
+}
+.dg-tri.on-w {
+  fill: #1b1b1b;
+}
+
+.dg-label-bg {
+  fill: var(--wood);
+}
+
+.dg-label {
+  font-size: 0.6px;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  fill: #1b1b1b;
 }

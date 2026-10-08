@@ -17,8 +17,14 @@ export interface GoState {
   /** 死石と判定された石の位置 */
   dead: number[];
   komi: number;
+  /** 置石の数（0 = 互先・定先） */
+  handicap: number;
   last: number;
   moveCount: number;
+  /** 着手後の盤面（同形反復の判定用） */
+  seen: string[];
+  /** 三コウなどの同形反復で無勝負になった */
+  noResult: boolean;
 }
 
 export type GoMove =
@@ -33,7 +39,43 @@ export type GoMove =
 
 export interface GoOptions {
   size: number;
+  /** 'even' = 互先（コミ6目半）, 'sente' = 定先（コミなし）, 数値 = 置石の数 */
+  handicap: 'even' | 'sente' | number;
 }
+
+/** 置石の位置（黒から見た標準の配置）。row 0 が盤の上辺 */
+export function handicapPoints(size: number, stones: number): number[] {
+  const lo = size >= 13 ? 3 : 2;
+  const hi = size - 1 - lo;
+  const mid = (size - 1) / 2;
+  const at = (r: number, c: number) => r * size + c;
+  const upperRight = at(lo, hi);
+  const lowerLeft = at(hi, lo);
+  const lowerRight = at(hi, hi);
+  const upperLeft = at(lo, lo);
+  const center = at(mid, mid);
+  const left = at(mid, lo);
+  const right = at(mid, hi);
+  const top = at(lo, mid);
+  const bottom = at(hi, mid);
+  const corners = [upperRight, lowerLeft, lowerRight, upperLeft];
+  switch (stones) {
+    case 2: return [upperRight, lowerLeft];
+    case 3: return [upperRight, lowerLeft, lowerRight];
+    case 4: return corners;
+    case 5: return [...corners, center];
+    case 6: return [...corners, left, right];
+    case 7: return [...corners, left, right, center];
+    case 8: return [...corners, left, right, top, bottom];
+    case 9: return [...corners, left, right, top, bottom, center];
+    default: return [];
+  }
+}
+
+/** その盤で選べる置石の最大数 */
+export const maxHandicap = (size: number) => (size >= 13 ? 9 : 5);
+
+const boardKey = (board: number[], turn: Player) => board.join('') + turn;
 
 const neighborCache = new Map<number, number[][]>();
 export function neighbors(size: number): number[][] {
@@ -121,7 +163,16 @@ export interface Score {
   territory: number[];
 }
 
-/** 日本ルール: 地 + アゲハマ + 死石（白にはコミを加える） */
+/** そこに c の石を置くと、置いた石の連がアタリ以下になる（自殺手を含む） */
+function selfAtari(board: number[], size: number, p: number, c: number): boolean {
+  const res = tryPlay(board, size, p, c);
+  return !res || groupAt(res.board, size, p).liberties <= 1;
+}
+
+/**
+ * 日本ルール: 地 + アゲハマ + 死石（白にはコミを加える）。
+ * セキの石が囲んでいる眼は地にしない。
+ */
 export function score(s: GoState): Score {
   const n = s.size * s.size;
   const nb = neighbors(s.size);
@@ -129,27 +180,49 @@ export function score(s: GoState): Score {
   const alive = s.board.map((v, i) => (deadSet.has(i) ? 0 : v));
   const territory = new Array(n).fill(0);
   const seen = new Uint8Array(n);
+  const regions: { points: number[]; borders: Set<number>; stones: Set<number> }[] = [];
   for (let i = 0; i < n; i++) {
     if (alive[i] !== 0 || seen[i]) continue;
-    const region: number[] = [];
+    const points: number[] = [];
     const borders = new Set<number>();
+    const stones = new Set<number>();
     const stack = [i];
     seen[i] = 1;
     while (stack.length) {
       const j = stack.pop()!;
-      region.push(j);
+      points.push(j);
       for (const k of nb[j]) {
-        if (alive[k] !== 0) borders.add(alive[k]);
-        else if (!seen[k]) {
+        if (alive[k] !== 0) {
+          borders.add(alive[k]);
+          stones.add(k);
+        } else if (!seen[k]) {
           seen[k] = 1;
           stack.push(k);
         }
       }
     }
-    if (borders.size === 1) {
-      const owner = [...borders][0];
-      for (const j of region) territory[j] = owner;
+    regions.push({ points, borders, stones });
+  }
+
+  // セキの判定: 黒白どちらが打っても自分がアタリになる共有のダメに接する連はセキ
+  const inSeki = new Uint8Array(n);
+  for (const r of regions) {
+    if (r.borders.size !== 2) continue;
+    const sekiPoint = r.points.some(
+      (p) => nb[p].some((k) => alive[k] !== 0) && selfAtari(alive, s.size, p, 1) && selfAtari(alive, s.size, p, 2),
+    );
+    if (!sekiPoint) continue;
+    for (const st of r.stones) {
+      if (inSeki[st]) continue;
+      for (const g of groupAt(alive, s.size, st).stones) inSeki[g] = 1;
     }
+  }
+
+  for (const r of regions) {
+    if (r.borders.size !== 1) continue;
+    if ([...r.stones].some((st) => inSeki[st])) continue;
+    const owner = [...r.borders][0];
+    for (const j of r.points) territory[j] = owner;
   }
   let black = s.captures[0];
   let white = s.captures[1] + s.komi;
@@ -269,19 +342,27 @@ function toggleGroup(s: GoState, p: number): number[] {
 }
 
 export const go: GameEngine<GoState, GoMove, GoOptions> = {
-  initial({ size }) {
+  initial({ size, handicap }) {
+    const board = new Array(size * size).fill(0);
+    const stones = typeof handicap === 'number' ? Math.min(handicap, maxHandicap(size)) : 0;
+    for (const p of handicapPoints(size, stones)) board[p] = 1;
+    // 置き碁は白から打ち、コミはなし。定先もコミなし
+    const turn: Player = stones >= 2 ? 1 : 0;
     return {
       size,
-      board: new Array(size * size).fill(0),
-      turn: 0,
+      board,
+      turn,
       ko: -1,
       captures: [0, 0],
       passes: 0,
       phase: 'play',
       dead: [],
-      komi: 6.5,
+      komi: handicap === 'even' ? 6.5 : 0,
+      handicap: stones,
       last: -1,
       moveCount: 0,
+      seen: [boardKey(board, turn)],
+      noResult: false,
     };
   },
   turn: (s) => s.turn,
@@ -293,7 +374,21 @@ export const go: GameEngine<GoState, GoMove, GoOptions> = {
         const res = tryPlay(s.board, s.size, m.p, s.turn + 1)!;
         const captures: [number, number] = [...s.captures];
         captures[s.turn] += res.captured;
-        return { ...s, board: res.board, turn: next, ko: res.ko, captures, passes: 0, last: m.p, moveCount: s.moveCount + 1 };
+        const key = boardKey(res.board, next);
+        // 同じ全局面が 3 回目に現れたら、三コウ・長生などの循環とみなして無勝負
+        const noResult = s.noResult || s.seen.filter((k) => k === key).length >= 2;
+        return {
+          ...s,
+          board: res.board,
+          turn: next,
+          ko: res.ko,
+          captures,
+          passes: 0,
+          last: m.p,
+          moveCount: s.moveCount + 1,
+          seen: [...s.seen, key],
+          noResult,
+        };
       }
       case 'pass': {
         const after: GoState = { ...s, turn: next, ko: -1, passes: s.passes + 1, last: -1, moveCount: s.moveCount + 1 };
@@ -309,11 +404,12 @@ export const go: GameEngine<GoState, GoMove, GoOptions> = {
     }
   },
   outcome(s): Outcome | null {
+    if (s.noResult) return { winner: null, reason: '同形反復（三コウなど）のため無勝負' };
     if (s.phase !== 'ended') return null;
     const { black, white } = score(s);
     const diff = Math.abs(black - white);
     const reason = `黒 ${black}目・白 ${white}目`;
-    if (black === white) return { winner: null, reason };
+    if (black === white) return { winner: null, reason: `持碁（${reason}）` };
     return { winner: black > white ? 0 : 1, reason: `${diff}目差（${reason}）` };
   },
 };
