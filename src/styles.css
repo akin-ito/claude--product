@@ -1,0 +1,1226 @@
+:root {
+  --bg: #f4ede1;
+  --surface: #fffaf2;
+  --surface-2: #efe4d2;
+  --text: #2b2118;
+  --muted: #7a6a58;
+  --line: #d9c9b1;
+  --accent: #b5532a;
+  --accent-text: #ffffff;
+  --win: #2f7d4a;
+  --lose: #a83b32;
+  --wood: #dcb67a;
+  --wood-line: #5a4127;
+  --felt: #2f7d4a;
+  --felt-line: #1f5a35;
+  --sq-light: #efd9b4;
+  --sq-dark: #b58863;
+  --select: rgba(255, 214, 10, 0.55);
+  --lastmove: rgba(255, 214, 10, 0.32);
+  --hint: rgba(0, 0, 0, 0.28);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 4px 16px rgba(0, 0, 0, 0.06);
+  color-scheme: light;
+}
+
+/* ダーク配色。端末の設定に従い、明示的なテーマ指定（data-theme）があればそちらを優先する */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #17130f;
+    --surface: #221c16;
+    --surface-2: #2d251d;
+    --text: #f1e7d8;
+    --muted: #a8977f;
+    --line: #3d3328;
+    --accent: #e07a4b;
+    --accent-text: #1a120c;
+    --win: #6fcf8f;
+    --lose: #f08a80;
+    --wood: #c9a266;
+    --wood-line: #4a341e;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg: #17130f;
+  --surface: #221c16;
+  --surface-2: #2d251d;
+  --text: #f1e7d8;
+  --muted: #a8977f;
+  --line: #3d3328;
+  --accent: #e07a4b;
+  --accent-text: #1a120c;
+  --win: #6fcf8f;
+  --lose: #f08a80;
+  --wood: #c9a266;
+  --wood-line: #4a341e;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic UI',
+    Meiryo, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+body {
+  min-height: 100dvh;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  touch-action: manipulation;
+}
+
+/* ------------------------------------------------------------ メニュー */
+
+.menu {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: calc(env(safe-area-inset-top) + 28px) 16px calc(env(safe-area-inset-bottom) + 24px);
+}
+
+.menu-header h1 {
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: 0.04em;
+}
+
+.menu-header p {
+  margin: 6px 0 20px;
+  color: var(--muted);
+}
+
+.game-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.game-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px 0 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  color: inherit;
+  text-decoration: none;
+  transition: transform 0.1s;
+}
+
+.game-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 0 14px 16px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.game-main:active {
+  opacity: 0.7;
+}
+
+.rules-link {
+  flex: none;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.game-icon {
+  width: 52px;
+  height: 52px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  font-size: 30px;
+  line-height: 1;
+}
+
+.card-gomoku .game-icon {
+  background: var(--wood);
+  color: #1b1b1b;
+}
+.card-reversi .game-icon {
+  background: var(--felt);
+  color: #fafafa;
+}
+.card-chess .game-icon {
+  background: var(--sq-dark);
+  color: #fff;
+}
+.card-shogi .game-icon {
+  background: #e9c98e;
+  color: #1b1b1b;
+  font-family: 'Hiragino Mincho ProN', 'Yu Mincho', 'Noto Serif JP', serif;
+  font-weight: 700;
+}
+.card-go .game-icon {
+  background: #1b1b1b;
+  color: #fafafa;
+  font-family: 'Hiragino Mincho ProN', 'Yu Mincho', 'Noto Serif JP', serif;
+  font-weight: 700;
+}
+
+.game-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.game-text strong {
+  font-size: 18px;
+}
+
+.game-text small {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+
+.menu-foot {
+  margin-top: 20px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* ------------------------------------------------------------ 対局画面 */
+
+.game {
+  --board: min(calc(100vw - 16px), calc(100dvh - 250px), 560px);
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+}
+
+.topbar {
+  width: 100%;
+  max-width: 600px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+}
+
+.topbar-title {
+  flex: 1;
+  text-align: center;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.mode {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.icon-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: none;
+  background: var(--surface-2);
+  font-size: 26px;
+  line-height: 1;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 6px 14px;
+  margin: 0 8px 6px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-weight: 600;
+  font-size: 15px;
+  text-align: center;
+}
+
+.status-win {
+  color: var(--win);
+  border-color: var(--win);
+}
+.status-lose {
+  color: var(--lose);
+  border-color: var(--lose);
+}
+
+.turn-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid #1b1b1b;
+  flex: none;
+}
+.turn-0 {
+  background: #1b1b1b;
+}
+.turn-1 {
+  background: #fafafa;
+}
+/* チェスは白が先手 */
+.white-first .turn-0 {
+  background: #fafafa;
+}
+.white-first .turn-1 {
+  background: #1b1b1b;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  animation: spin 0.8s linear infinite;
+  flex: none;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.board-area {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+}
+
+.hint {
+  margin: 0;
+  min-height: 1.4em;
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+.scoreline {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.disc-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.disc-count .disc {
+  width: 16px;
+  height: 16px;
+}
+
+.controls {
+  width: 100%;
+  max-width: 600px;
+  display: flex;
+  gap: 8px;
+  padding: 10px 8px 12px;
+}
+
+.controls button,
+.inline-actions button,
+.sheet-actions button {
+  flex: 1;
+  min-height: 46px;
+  padding: 0 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+button:disabled {
+  opacity: 0.4;
+}
+
+.inline-actions {
+  display: flex;
+  gap: 8px;
+  width: var(--board);
+}
+
+/* ------------------------------------------------------------ 設定シート */
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 10;
+  animation: fade 0.15s;
+}
+
+.sheet {
+  width: 100%;
+  max-width: 560px;
+  background: var(--surface);
+  border-radius: 20px 20px 0 0;
+  padding: 20px 16px calc(env(safe-area-inset-bottom) + 16px);
+  animation: rise 0.2s ease-out;
+}
+
+.sheet.compact h2 {
+  text-align: center;
+}
+
+.sheet h2 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+
+.sheet fieldset {
+  border: none;
+  margin: 0 0 14px;
+  padding: 0;
+}
+
+.sheet legend {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.sheet-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.segmented {
+  display: flex;
+  background: var(--surface-2);
+  border-radius: 12px;
+  padding: 3px;
+  gap: 3px;
+}
+
+.segmented button {
+  flex: 1;
+  min-height: 42px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.segmented button.on {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ------------------------------------------------------------ マス目の盤（リバーシ・チェス・将棋） */
+
+.grid-board {
+  width: var(--board);
+  height: var(--board);
+  display: grid;
+  user-select: none;
+}
+
+.grid-board .cell {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.grid-board .cell:disabled {
+  opacity: 1;
+}
+
+.hint-dot {
+  width: 28%;
+  height: 28%;
+  border-radius: 50%;
+  background: var(--hint);
+  position: absolute;
+}
+
+.capture-ring {
+  position: absolute;
+  inset: 4%;
+  border-radius: 50%;
+  border: 3px solid var(--hint);
+}
+
+/* リバーシ */
+.grid-board.reversi {
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  gap: 2px;
+  padding: 2px;
+  background: var(--felt-line);
+  border-radius: 6px;
+}
+
+.reversi .cell {
+  background: var(--felt);
+}
+
+.reversi .cell.last {
+  box-shadow: inset 0 0 0 3px rgba(255, 214, 10, 0.75);
+}
+
+.disc {
+  display: block;
+  width: 84%;
+  height: 84%;
+  border-radius: 50%;
+}
+
+.disc-b {
+  background: radial-gradient(circle at 35% 30%, #555, #111 60%);
+}
+
+.disc-w {
+  background: radial-gradient(circle at 35% 30%, #fff, #ddd 70%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+}
+
+.reversi .hint-dot {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* チェス */
+.grid-board.chess {
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.chess .cell.light {
+  background: var(--sq-light);
+}
+.chess .cell.dark {
+  background: var(--sq-dark);
+}
+.chess .cell.last::before,
+.chess .cell.selected::before,
+.chess .cell.check::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+.chess .cell.last::before {
+  background: var(--lastmove);
+}
+.chess .cell.selected::before {
+  background: var(--select);
+}
+.chess .cell.check::before {
+  background: radial-gradient(circle, rgba(230, 30, 30, 0.85), rgba(230, 30, 30, 0) 70%);
+}
+
+.chess-piece {
+  position: relative;
+  font-size: calc(var(--board) / 8 * 0.78);
+  line-height: 1;
+  font-family: 'Segoe UI Symbol', 'Apple Symbols', 'DejaVu Sans', 'Noto Sans Symbols 2', sans-serif;
+}
+
+.chess-piece.white {
+  color: #fff;
+  -webkit-text-stroke: 1.2px #222;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+}
+
+.chess-piece.black {
+  color: #1b1b1b;
+  -webkit-text-stroke: 0.6px #000;
+}
+
+.promo-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.promo-btn {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--sq-light);
+  display: grid;
+  place-items: center;
+}
+
+.promo-btn .chess-piece {
+  font-size: 44px;
+}
+
+/* 将棋 */
+.game:has(.shogi) {
+  --board: min(calc(100vw - 40px), calc(100dvh - 360px), 520px);
+}
+
+.shogi-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.shogi-cols {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  width: var(--board);
+  margin-right: 18px;
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.shogi-main {
+  display: flex;
+}
+
+.shogi-rows {
+  display: grid;
+  grid-template-rows: repeat(9, 1fr);
+  width: 18px;
+  font-size: 11px;
+  color: var(--muted);
+  align-items: center;
+  text-align: center;
+}
+
+.grid-board.shogi {
+  grid-template-columns: repeat(9, 1fr);
+  grid-template-rows: repeat(9, 1fr);
+  border: 2px solid var(--wood-line);
+  gap: 1px;
+  background: var(--wood-line);
+}
+
+.shogi .cell {
+  background: #e9c98e;
+}
+
+.shogi .cell.last {
+  background: #f3d88f;
+}
+
+.shogi .cell.selected {
+  background: #ffd84d;
+}
+
+.koma {
+  display: grid;
+  place-items: center;
+  width: 86%;
+  height: 92%;
+  clip-path: polygon(50% 0, 88% 18%, 100% 100%, 0 100%, 12% 18%);
+  background: linear-gradient(#f7e2b5, #e7c78c);
+  color: #1b1b1b;
+  font-family: 'Hiragino Mincho ProN', 'Yu Mincho', 'Noto Serif JP', serif;
+  font-weight: 700;
+  font-size: calc(var(--board) / 9 * 0.5);
+  line-height: 1;
+  padding-top: 8%;
+}
+
+.koma.gote {
+  transform: rotate(180deg);
+}
+
+.koma.promoted {
+  color: #c21f1f;
+}
+
+.hand {
+  width: var(--board);
+  min-height: calc(var(--board) / 9 + 8px);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  overflow-x: auto;
+}
+
+.hand.active {
+  border-color: var(--accent);
+}
+
+.hand-label {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  margin-right: 4px;
+}
+
+.hand-empty {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.hand-piece {
+  position: relative;
+  width: calc(var(--board) / 9);
+  height: calc(var(--board) / 9);
+  flex: none;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  display: grid;
+  place-items: center;
+}
+
+.hand-piece.selected {
+  background: #ffd84d;
+}
+
+.hand-count {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 11px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+
+/* ------------------------------------------------------------ 交点の盤（囲碁・五目並べ） */
+
+.ix-board {
+  width: var(--board);
+  height: var(--board);
+  display: block;
+  user-select: none;
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+}
+
+.ix-bg {
+  fill: var(--wood);
+}
+
+.ix-lines line {
+  stroke: var(--wood-line);
+}
+
+.ix-star {
+  fill: var(--wood-line);
+}
+
+.stone-b {
+  fill: #1b1b1b;
+}
+
+.stone-w {
+  fill: #fafafa;
+  stroke: #555;
+  stroke-width: 0.03;
+}
+
+.stone.ghost {
+  opacity: 0.45;
+}
+
+.stone.dim {
+  opacity: 0.35;
+}
+
+.last-mark.on-b {
+  fill: #e94b3c;
+}
+.last-mark.on-w {
+  fill: #e94b3c;
+}
+
+.terr-b {
+  fill: #1b1b1b;
+}
+.terr-w {
+  fill: #fafafa;
+  stroke: #555;
+  stroke-width: 0.03;
+}
+
+.icon-btn.small {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.select {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+}
+
+.forbid {
+  stroke: #d33;
+  stroke-width: 0.08;
+  stroke-linecap: round;
+}
+
+.inline-actions .note {
+  flex: 2;
+  font-size: 12px;
+  color: var(--muted);
+  align-self: center;
+}
+
+/* ------------------------------------------------------------ ルール */
+
+.rules {
+  max-width: 680px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  padding: env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 16px);
+}
+
+.rules-topbar {
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  z-index: 2;
+}
+
+.icon-btn-spacer {
+  width: 44px;
+  flex: none;
+}
+
+.rules-tabs {
+  position: sticky;
+  top: 60px;
+  z-index: 2;
+  background: var(--bg);
+  padding: 0 16px 8px;
+}
+
+.rules-body {
+  padding: 0 16px;
+  line-height: 1.8;
+  font-size: 15px;
+}
+
+.rules-body h2 {
+  margin: 28px 0 8px;
+  font-size: 19px;
+  padding-bottom: 4px;
+  border-bottom: 2px solid var(--line);
+}
+
+.rules-body h3 {
+  margin: 20px 0 4px;
+  font-size: 16px;
+}
+
+.rules-body p,
+.rules-body ul,
+.rules-body ol {
+  margin: 6px 0;
+}
+
+.rules-body ul,
+.rules-body ol {
+  padding-left: 1.4em;
+}
+
+.rules-body li {
+  margin: 4px 0;
+}
+
+.rules-body dl {
+  margin: 8px 0;
+}
+
+.rules-body dt {
+  font-weight: 700;
+  margin-top: 10px;
+}
+
+.rules-body dd {
+  margin: 2px 0 0 1em;
+}
+
+.rules-body .lead {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 12px;
+}
+
+.rules-foot {
+  display: flex;
+  gap: 8px;
+  padding: 24px 16px 8px;
+}
+
+.rules-foot button {
+  flex: 1;
+  min-height: 48px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-weight: 600;
+}
+
+/* 図 */
+.dg-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+}
+
+.diagram {
+  margin: 12px auto;
+  max-width: 300px;
+  flex: 0 1 auto;
+  min-width: 96px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.diagram figcaption {
+  max-width: 220px;
+  margin-top: 6px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+  text-align: center;
+}
+
+.dg-grid {
+  display: grid;
+  max-width: 300px;
+}
+
+.dg-grid .dg-cell {
+  position: relative;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  container-type: inline-size;
+}
+
+.dg-chess .dg-cell.light {
+  background: var(--sq-light);
+}
+.dg-chess .dg-cell.dark {
+  background: var(--sq-dark);
+}
+.dg-chess .chess-piece {
+  font-size: 78cqw;
+}
+
+.dg-shogi {
+  gap: 1px;
+  background: var(--wood-line);
+  border: 1px solid var(--wood-line);
+}
+.dg-shogi .dg-cell {
+  background: #e9c98e;
+}
+.dg-shogi .koma {
+  font-size: 50cqw;
+}
+
+.dg-reversi {
+  gap: 1px;
+  background: var(--felt-line);
+  border: 1px solid var(--felt-line);
+}
+.dg-reversi .dg-cell {
+  background: var(--felt);
+}
+.dg-reversi .disc.flipped {
+  box-shadow: 0 0 0 2px #e94b3c;
+}
+
+.dg-grid .dg-cell.mark::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(230, 40, 40, 0.38);
+}
+
+.dg-dot {
+  width: 30%;
+  height: 30%;
+  border-radius: 50%;
+  background: #e94b3c;
+}
+
+.dg-dot.slide {
+  background: transparent;
+  border: 2px solid #e94b3c;
+}
+
+.dg-points {
+  max-width: 300px;
+  display: block;
+  border-radius: 4px;
+}
+
+.dg-pt {
+  fill: #e94b3c;
+}
+
+.dg-tri.on-b {
+  fill: #fff;
+}
+.dg-tri.on-w {
+  fill: #1b1b1b;
+}
+
+.dg-label-bg {
+  fill: var(--wood);
+}
+
+.dg-label {
+  font-size: 0.6px;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  fill: #1b1b1b;
+}
+
+/* ------------------------------------------------------------ 時計 */
+
+.dot-black {
+  background: #1b1b1b;
+}
+.dot-white {
+  background: #fafafa;
+}
+
+.clockbar {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  max-width: 600px;
+  padding: 0 8px 6px;
+}
+
+.clock {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: 'name time' 'sub time';
+  align-items: center;
+  column-gap: 8px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.clock.active {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.clock.low .clock-time {
+  color: var(--lose);
+}
+
+.clock-name {
+  grid-area: name;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.clock-sub {
+  grid-area: sub;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.clock-time {
+  grid-area: time;
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.sheet {
+  max-height: 88dvh;
+  overflow-y: auto;
+}
+
+.time-detail {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.num-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.num-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.num-field input {
+  width: 72px;
+  min-height: 40px;
+  padding: 0 8px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  text-align: right;
+}
+
+.game:has(.clockbar) {
+  --board: min(calc(100vw - 16px), calc(100dvh - 310px), 560px);
+}
+
+.game:has(.clockbar):has(.shogi) {
+  --board: min(calc(100vw - 40px), calc(100dvh - 420px), 520px);
+}
+
+.offer-banner {
+  width: var(--board);
+  max-width: 100%;
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--accent);
+  background: var(--surface);
+  font-weight: 600;
+  text-align: center;
+}
+
+.offer-banner .inline-actions {
+  width: 100%;
+}
+
+.area-box {
+  fill: rgba(233, 75, 60, 0.12);
+  stroke: #e94b3c;
+  stroke-width: 0.05;
+  stroke-dasharray: 0.2 0.12;
+}
+
+.proposal-label {
+  font-size: 0.5px;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  fill: #fff;
+}
+
+.opening-hint {
+  color: var(--text);
+  font-weight: 600;
+  width: var(--board);
+  max-width: 100%;
+}
+
+.inline-actions .select {
+  flex: 1;
+}
