@@ -54,7 +54,7 @@ describe('五目並べ（ルールガイドの図を含む）', () => {
 
   it('長連の扱いはルールで異なる', () => {
     const make = (rule: 'free' | 'standard' | 'renju', color: 'black' | 'white') => {
-      let s = gomoku.initial({ rule });
+      let s = gomoku.initial({ rule, opening: 'none' });
       const row = 7 * SIZE;
       const mine = [row + 1, row + 2, row + 3, row + 5, row + 6];
       const theirs = [0, 2, 4, 6, 8];
@@ -99,7 +99,7 @@ describe('チェス（FIDE）', () => {
   ];
 
   it('3回同形は申請で引き分け、5回同形は自動で引き分け', () => {
-    let s = chess.initial({});
+    let s = chess.initial({ drawRule: 'fide' });
     for (let k = 0; k < 2; k++) for (const m of shuffle) s = chess.apply(s, m);
     expect(chess.outcome(s)).toBeNull();
     expect(claimableDraw(s)).toBe('同一局面3回');
@@ -109,7 +109,7 @@ describe('チェス（FIDE）', () => {
   });
 
   it('アンパッサンできないときは、局面の区別に含めない', () => {
-    const s = chess.apply(chess.initial({}), { from: 52, to: 36 }); // e4
+    const s = chess.apply(chess.initial({ drawRule: 'fide' }), { from: 52, to: 36 }); // e4
     expect(s.ep).toBe(44);
     expect(s.keys[1].endsWith('-1')).toBe(true);
   });
@@ -117,7 +117,7 @@ describe('チェス（FIDE）', () => {
 
 describe('将棋（駒落ち・入玉宣言）', () => {
   it('駒落ちは上手の駒を除き、上手から指す', () => {
-    const s = shogi.initial({ handicap: 'two' });
+    const s = shogi.initial({ handicap: 'two', declareRule: '27' });
     expect(s.turn).toBe(1);
     expect(s.board[10]).toBe(0);
     expect(s.board[16]).toBe(0);
@@ -125,7 +125,7 @@ describe('将棋（駒落ち・入玉宣言）', () => {
   });
 
   it('駒落ちでも千日手の手番を正しく数える', () => {
-    let s = shogi.initial({ handicap: 'bishop' });
+    let s = shogi.initial({ handicap: 'bishop', declareRule: '27' });
     const cycle = [
       { from: 10, to: 11, promote: false }, // 上手 8二飛 → 7二
       { from: 70, to: 69, promote: false }, // 下手 2八飛 → 3八
@@ -145,7 +145,7 @@ describe('将棋（駒落ち・入玉宣言）', () => {
     board[8 * 9 + 8] = -OU; // 後手玉 1九
     const hands: [number[], number[]] = [new Array(8).fill(0), new Array(8).fill(0)];
     hands[0][FU] = 10;
-    return { board, hands, turn: 0, handicap: 'none', startTurn: 0, declared: null, keys: ['x'], checks: [false], lastMove: null };
+    return { board, hands, turn: 0, handicap: 'none', declareRule: '27', offer: null, declined: null, agreed: false, declareResult: null, startTurn: 0, declared: null, keys: ['x'], checks: [false], lastMove: null };
   };
 
   it('27点法の条件を満たせば宣言勝ち', () => {
@@ -176,15 +176,15 @@ describe('将棋（駒落ち・入玉宣言）', () => {
 });
 
 describe('囲碁（日本ルール）', () => {
-  const fromRows = (rows: string[], handicap: GoState['handicap'] = 0): GoState => {
+  const fromRows = (rows: string[], ruleset: GoState['ruleset'] = 'japanese'): GoState => {
     const size = rows.length;
-    const s = go.initial({ size, handicap: 'even' });
+    const s = go.initial({ size, handicap: 'even', ruleset, komi: ruleset === 'japanese' ? 6.5 : 7.5 });
     const board = rows.join('').split('').map((ch) => (ch === 'X' ? 1 : ch === 'O' ? 2 : 0));
-    return { ...s, board, handicap, phase: 'ended' };
+    return { ...s, board, phase: 'ended' };
   };
 
   it('置き碁は定位置に置石、白から打ち、コミなし', () => {
-    const s = go.initial({ size: 19, handicap: 4 });
+    const s = go.initial({ size: 19, handicap: 4, ruleset: 'japanese', komi: 6.5 });
     expect(s.board.filter((v) => v === 1).length).toBe(4);
     expect(s.turn).toBe(1);
     expect(s.komi).toBe(0);
@@ -192,7 +192,7 @@ describe('囲碁（日本ルール）', () => {
   });
 
   it('定先はコミなしで黒から', () => {
-    const s = go.initial({ size: 9, handicap: 'sente' });
+    const s = go.initial({ size: 9, handicap: 'sente', ruleset: 'japanese', komi: 6.5 });
     expect(s.turn).toBe(0);
     expect(s.komi).toBe(0);
   });
@@ -217,7 +217,7 @@ describe('囲碁（日本ルール）', () => {
   });
 
   it('同じ全局面が3回現れたら無勝負', () => {
-    let s = go.initial({ size: 9, handicap: 'even' });
+    let s = go.initial({ size: 9, handicap: 'even', ruleset: 'japanese', komi: 6.5 });
     const play = (p: number) => (s = go.apply(s, { t: 'play', p }));
     // コウの形を作り、パスを挟んで取り合いを続ける（同じ局面を循環させる）
     const passTwiceAndResume = () => {

@@ -22,6 +22,20 @@ export interface ChessState extends ChessPos {
   lastMove: ChessMove | null;
   /** 引き分けを申請して認められた理由 */
   claimed: string | null;
+  /** fide = 3回同形・50手は申請制, auto = 自動で引き分け（オンライン対局の方式） */
+  drawRule: DrawRule;
+  /** 引き分けを提案している側 */
+  offer: Player | null;
+  /** 直前に引き分けの提案を断った側（表示用） */
+  declined: Player | null;
+  /** 合意による引き分けが成立した */
+  agreed: boolean;
+}
+
+export type DrawRule = 'fide' | 'auto';
+
+export interface ChessOptions {
+  drawRule: DrawRule;
 }
 
 export type Promo = 'q' | 'r' | 'b' | 'n';
@@ -33,7 +47,15 @@ export interface ChessMove {
 }
 
 /** 駒を動かす手、または引き分けの申請 */
-export type ChessAction = ChessMove | { claim: true };
+export type ChessAction =
+  | ChessMove
+  | { claim: true }
+  /** 引き分けを提案する（自分の手番に提案し、そのまま手を指す） */
+  | { offer: true }
+  /** 相手の提案を受ける */
+  | { accept: true }
+  /** 相手の提案を断る */
+  | { decline: true };
 
 const isWhite = (p: string) => p !== '' && p <= 'Z';
 const ownedBy = (p: string, player: Player) => p !== '' && isWhite(p) === (player === 0);
@@ -65,7 +87,7 @@ export function fromFEN(fen: string): ChessState {
     ep: epSq,
     halfmove: Number(half ?? 0),
   };
-  return { ...pos, keys: [positionKey(pos)], lastMove: null, claimed: null };
+  return { ...pos, keys: [positionKey(pos)], lastMove: null, claimed: null, drawRule: 'fide', offer: null, declined: null, agreed: false };
 }
 
 export const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
@@ -299,15 +321,40 @@ function insufficientMaterial(board: string[]): boolean {
   return false;
 }
 
-export const chess: GameEngine<ChessState, ChessAction> = {
-  initial: () => fromFEN(START_FEN),
+/** 相手からの引き分けの提案が出ているか */
+export const offerPending = (s: ChessState) => s.offer !== null && s.offer !== s.turn;
+
+/** 時間切れで勝つはずの側が、どうやってもチェックメイトできない駒しか持っていないか（FIDE 6.9） */
+function cannotMate(board: string[], winner: Player): boolean {
+  const own = (p: string) => p !== '' && isWhite(p) === (winner === 0);
+  const mine = board.filter((p) => own(p) && p.toUpperCase() !== 'K').map((p) => p.toUpperCase());
+  const theirs = board.filter((p) => p !== '' && !own(p) && p.toUpperCase() !== 'K');
+  if (mine.length === 0) return true;
+  // キング＋ナイト1つ、またはキング＋ビショップだけで、相手がキングのみ
+  return theirs.length === 0 && mine.length === 1 && (mine[0] === 'N' || mine[0] === 'B');
+}
+
+export const chess: GameEngine<ChessState, ChessAction, ChessOptions> = {
+  initial: ({ drawRule }) => ({ ...fromFEN(START_FEN), drawRule }),
   turn: (s) => s.turn,
   apply(s, m) {
     if ('claim' in m) return { ...s, claimed: claimableDraw(s) };
+    if ('offer' in m) return { ...s, offer: s.turn };
+    if ('accept' in m) return offerPending(s) ? { ...s, agreed: true } : s;
+    if ('decline' in m) return offerPending(s) ? { ...s, offer: null, declined: s.turn } : s;
     const pos = makeMove(s, m);
-    return { ...pos, keys: [...s.keys, positionKey(pos)], lastMove: m, claimed: null };
+    // 自分の提案は相手の手番まで有効。相手の提案は、受けずに指せば断ったことになる
+    const offer = s.offer === s.turn ? s.offer : null;
+    const declined = offerPending(s) ? s.turn : null;
+    return { ...s, ...pos, keys: [...s.keys, positionKey(pos)], lastMove: m, claimed: null, offer, declined };
+  },
+  timeoutOutcome(s, loser) {
+    const winner: Player = loser === 0 ? 1 : 0;
+    if (cannotMate(s.board, winner)) return { winner: null, reason: '時間切れ（相手にチェックメイトできる駒がない）' };
+    return { winner, reason: '時間切れ' };
   },
   outcome(s): Outcome | null {
+    if (s.agreed) return { winner: null, reason: '合意' };
     if (s.claimed) return { winner: null, reason: `${s.claimed}（申請）` };
     if (legalMoves(s).length === 0) {
       if (inCheck(s)) return { winner: s.turn === 0 ? 1 : 0, reason: 'チェックメイト' };
@@ -317,6 +364,10 @@ export const chess: GameEngine<ChessState, ChessAction> = {
     // 5回同形と75手ルールは申請なしで自動的に引き分け
     if (repetitions(s) >= 5) return { winner: null, reason: '同一局面5回' };
     if (s.halfmove >= 150) return { winner: null, reason: '75手ルール' };
+    if (s.drawRule === 'auto') {
+      const auto = claimableDraw(s);
+      if (auto) return { winner: null, reason: auto };
+    }
     return null;
   },
 };
@@ -452,11 +503,17 @@ function search(p: ChessPos, depth: number, alpha: number, beta: number, ply: nu
   return best;
 }
 
-export function chooseChessMove(s: ChessState, level: Level): ChessAction {
+export function chooseChessMove(s: ChessState, level: Level, budgetMs?: number): ChessAction {
   // 同じ評価の手が並んだとき、毎回同じ手にならないよう先に混ぜておく
   const moves = sortMoves(s, shuffle(legalMoves(s)));
-  if (moves.length === 1) return moves[0];
   const claimable = level >= 2 && claimableDraw(s) !== null;
+  // 相手から引き分けの提案があれば、形勢が悪いときだけ受ける
+  const decide = (best: ChessMove, score: number): ChessAction => {
+    if (offerPending(s) && score < -30) return { accept: true };
+    if (claimable && score < -50) return { claim: true };
+    return best;
+  };
+  if (moves.length === 1) return decide(moves[0], 0);
 
   if (level === 1) {
     // 弱い: 1 手読み + ゆらぎ
@@ -469,11 +526,11 @@ export function chooseChessMove(s: ChessState, level: Level): ChessAction {
         best = m;
       }
     }
-    return best;
+    return decide(best, bestVal - 60);
   }
 
   const maxDepth = level === 2 ? 2 : 6;
-  const deadline = new Deadline(level === 2 ? 1500 : 3000);
+  const deadline = new Deadline(level === 2 ? 1500 : 3000, budgetMs);
   let ordered = moves;
   let best = moves[0];
   let bestScore = 0;
@@ -496,7 +553,5 @@ export function chooseChessMove(s: ChessState, level: Level): ChessAction {
   } catch (e) {
     if (!isAbort(e)) throw e;
   }
-  // 形勢が悪いなら、申請できる引き分けを取る
-  if (claimable && bestScore < -50) return { claim: true };
-  return best;
+  return decide(best, bestScore);
 }

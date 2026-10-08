@@ -1,4 +1,13 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import {
+  defaultTimeControl,
+  describeTimeControl,
+  display,
+  TIME_KIND_NAMES,
+  type ClockState,
+  type TimeControl,
+  type TimeKind,
+} from '../core/clock';
 import type { Settings } from '../core/useGameSession';
 import type { Level, Outcome, Player } from '../core/types';
 
@@ -12,6 +21,16 @@ export interface ShellSession<O> {
   undo(): void;
   resign(): void;
   newGame(s: Settings<O>): void;
+  clock: ClockState;
+  actor: Player;
+  clockRunning: boolean;
+  elapsed(): number;
+}
+
+/** よく使われる持ち時間の設定 */
+export interface TimePreset {
+  name: string;
+  time: TimeControl;
 }
 
 interface Props<O> {
@@ -24,6 +43,12 @@ interface Props<O> {
   flippable?: boolean;
   /** 先手が白（チェス） */
   whiteFirst?: boolean;
+  /** 手番の丸の色（指定がなければ席 0 = 黒） */
+  turnColor?: 'black' | 'white';
+  /** 設定画面で「あなたの手番」に表示する席の名前（指定がなければ sideNames） */
+  seatNames?: [string, string];
+  /** 持ち時間のプリセット */
+  timePresets?: TimePreset[];
   /** 新規対局の設定に、ゲーム固有の項目を足す */
   renderOptions?: (options: O, set: (o: O) => void) => ReactNode;
   onBack(): void;
@@ -39,6 +64,9 @@ export function GameShell<O>({
   session,
   flippable,
   whiteFirst,
+  turnColor,
+  seatNames,
+  timePresets = [],
   renderOptions,
   onBack,
   onRules,
@@ -72,7 +100,11 @@ export function GameShell<O>({
     status = `${who(turn)}の番`;
   }
 
-  const modeLabel = settings.mode === 'cpu' ? `CPU対戦・${LEVEL_NAMES[settings.level]}` : '2人対戦';
+  const timeLabel = describeTimeControl(settings.time);
+  const modeLabel = [settings.mode === 'cpu' ? `CPU対戦・${LEVEL_NAMES[settings.level]}` : '2人対戦', timeLabel]
+    .filter(Boolean)
+    .join('・');
+  const dot = turnColor ? (turnColor === 'black' ? 0 : 1) : turn;
 
   return (
     <div className={`game${whiteFirst ? ' white-first' : ''}`}>
@@ -90,10 +122,14 @@ export function GameShell<O>({
       </header>
 
       <div className={`status status-${tone}`} role="status">
-        {!outcome && <span className={`turn-dot turn-${turn}`} aria-hidden />}
+        {!outcome && <span className={`turn-dot ${turnColor ? `dot-${turnColor}` : `turn-${dot}`}`} aria-hidden />}
         {thinking && <span className="spinner" aria-hidden />}
         <span>{status}</span>
       </div>
+
+      {settings.time.kind !== 'none' && (
+        <ClockBar session={session} names={sideNames} flipped={flipped} humanSide={settings.mode === 'cpu' ? settings.humanSide : null} />
+      )}
 
       <main className="board-area">{children({ flipped })}</main>
 
@@ -113,7 +149,8 @@ export function GameShell<O>({
       {showSettings && (
         <SettingsSheet
           initial={settings}
-          sideNames={sideNames}
+          sideNames={seatNames ?? sideNames}
+          timePresets={timePresets}
           renderOptions={renderOptions}
           onCancel={() => setShowSettings(false)}
           onStart={(s) => {
@@ -127,15 +164,115 @@ export function GameShell<O>({
   );
 }
 
+/** 両者の残り時間。手番側を強調し、考えている間は毎秒更新する */
+function ClockBar<O>({
+  session,
+  names,
+  flipped,
+  humanSide,
+}: {
+  session: ShellSession<O>;
+  names: [string, string];
+  flipped: boolean;
+  humanSide: Player | null;
+}) {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (!session.clockRunning) return;
+    const id = setInterval(() => tick((n) => n + 1), 250);
+    return () => clearInterval(id);
+  }, [session.clockRunning]);
+  const order: Player[] = flipped ? [0, 1] : [1, 0];
+  return (
+    <div className="clockbar">
+      {order.map((p) => {
+        const active = !session.outcome && session.actor === p;
+        const d = display(session.settings.time, session.clock[p], active && session.clockRunning ? session.elapsed() : 0);
+        return (
+          <div key={p} className={`clock${active ? ' active' : ''}${d.low && active ? ' low' : ''}`}>
+            <span className="clock-name">
+              {names[p]}
+              {humanSide !== null && (p === humanSide ? '（あなた）' : '（CPU）')}
+            </span>
+            <span className="clock-time">{d.text}</span>
+            {d.sub && <span className="clock-sub">{d.sub}</span>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function TimeSettings({ value, presets, onChange }: { value: TimeControl; presets: TimePreset[]; onChange(t: TimeControl): void }) {
+  const num = (label: string, key: string, unit: 'min' | 'sec' | 'count', min = 0) => {
+    const raw = (value as unknown as Record<string, number>)[key];
+    const shown = unit === 'min' ? raw / 60 : raw;
+    const id = `time-${key}`;
+    return (
+      <label className="num-field" htmlFor={id}>
+        <span>{label}</span>
+        <input
+          id={id}
+          type="number"
+          inputMode="numeric"
+          min={min}
+          value={shown}
+          onChange={(e) => {
+            const n = Math.max(min, Number(e.target.value) || 0);
+            onChange({ ...value, [key]: unit === 'min' ? Math.round(n * 60) : n } as TimeControl);
+          }}
+        />
+        <span className="unit">{unit === 'min' ? '分' : unit === 'sec' ? '秒' : unit === 'count' && key === 'moves' ? '手' : '回'}</span>
+      </label>
+    );
+  };
+  const presetIndex = presets.findIndex((p) => JSON.stringify(p.time) === JSON.stringify(value));
+  return (
+    <fieldset>
+      <legend>持ち時間</legend>
+      {presets.length > 0 && (
+        <Select
+          value={presetIndex >= 0 ? String(presetIndex) : 'custom'}
+          options={[
+            ...presets.map((p, i) => [String(i), p.name] as [string, string]),
+            ['custom', 'カスタム（下で設定）'] as [string, string],
+          ]}
+          onChange={(v) => v !== 'custom' && onChange(presets[Number(v)].time)}
+        />
+      )}
+      <div className="time-detail">
+        <Select
+          value={value.kind}
+          options={(Object.keys(TIME_KIND_NAMES) as TimeKind[]).map((k) => [k, TIME_KIND_NAMES[k]] as [TimeKind, string])}
+          onChange={(k) => onChange(defaultTimeControl(k))}
+        />
+        {value.kind !== 'none' && (
+          <div className="num-row">
+            {num('持ち時間', 'mainSec', 'min')}
+            {value.kind === 'byoyomi' && num('秒読み', 'periodSec', 'sec', 1)}
+            {value.kind === 'byoyomi' && num('回数', 'periods', 'count', 1)}
+            {value.kind === 'fischer' && num('1手ごとに加算', 'incSec', 'sec')}
+            {value.kind === 'canadian' && num('区切り', 'periodSec', 'sec', 1)}
+            {value.kind === 'canadian' && num('手数', 'moves', 'count', 1)}
+            {value.kind === 'delay' && num('遅延', 'delaySec', 'sec')}
+          </div>
+        )}
+      </div>
+    </fieldset>
+  );
+}
+
 function SettingsSheet<O>({
   initial,
   sideNames,
+  timePresets,
   renderOptions,
   onCancel,
   onStart,
 }: {
   initial: Settings<O>;
   sideNames: [string, string];
+  timePresets: TimePreset[];
   renderOptions?: (options: O, set: (o: O) => void) => ReactNode;
   onCancel(): void;
   onStart(s: Settings<O>): void;
@@ -187,6 +324,8 @@ function SettingsSheet<O>({
         )}
 
         {renderOptions?.(s.options, (options) => setS({ ...s, options }))}
+
+        <TimeSettings value={s.time} presets={timePresets} onChange={(time) => setS({ ...s, time })} />
 
         <div className="sheet-actions">
           <button onClick={onCancel}>キャンセル</button>

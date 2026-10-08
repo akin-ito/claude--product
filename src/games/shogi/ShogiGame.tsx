@@ -1,9 +1,14 @@
 import { useState } from 'react';
-import { GameShell, Select } from '../../components/GameShell';
+import { GameShell, Segmented, Select } from '../../components/GameShell';
 import type { Player } from '../../core/types';
+import { TIME_PRESETS } from '../../core/timePresets';
 import { useGameSession } from '../../core/useGameSession';
 import {
+  bothKingsEntered,
   declaration,
+  offerPending,
+  totalPoints,
+  type DeclareRule,
   HANDICAPS,
   HI,
   inCheck,
@@ -31,7 +36,8 @@ export function ShogiGame({ onBack, onRules }: { onBack(): void; onRules(): void
     mode: 'cpu',
     humanSide: 0,
     level: 2,
-    options: { handicap: 'none' },
+    time: { kind: 'none' },
+    options: { handicap: 'none', declareRule: '27' },
   });
   const { state, canInput, play, outcome } = session;
   const [sel, setSel] = useState<{ key: unknown; s: Selection } | null>(null);
@@ -74,6 +80,7 @@ export function ShogiGame({ onBack, onRules }: { onBack(): void; onRules(): void
 
   return (
     <GameShell
+      timePresets={TIME_PRESETS.shogi}
       title="将棋"
       sideNames={sideNames}
       turn={state.turn}
@@ -82,14 +89,27 @@ export function ShogiGame({ onBack, onRules }: { onBack(): void; onRules(): void
       onBack={onBack}
       onRules={onRules}
       renderOptions={(o, set) => (
-        <fieldset>
-          <legend>手合い（駒落ちは上手が先に指します）</legend>
-          <Select
-            value={o.handicap}
-            options={HANDICAPS.map((h) => [h.id, h.name] as [Handicap, string])}
-            onChange={(handicap) => set({ ...o, handicap })}
-          />
-        </fieldset>
+        <>
+          <fieldset>
+            <legend>手合い（駒落ちは上手が先に指します）</legend>
+            <Select
+              value={o.handicap}
+              options={HANDICAPS.map((h) => [h.id, h.name] as [Handicap, string])}
+              onChange={(handicap) => set({ ...o, handicap })}
+            />
+          </fieldset>
+          <fieldset>
+            <legend>入玉宣言</legend>
+            <Segmented<DeclareRule>
+              value={o.declareRule}
+              options={[
+                ['27', '27点法（アマ大会）'],
+                ['24', '24点法（プロ公式戦）'],
+              ]}
+              onChange={(declareRule) => set({ ...o, declareRule })}
+            />
+          </fieldset>
+        </>
       )}
     >
       {({ flipped }) => {
@@ -145,13 +165,40 @@ export function ShogiGame({ onBack, onRules }: { onBack(): void; onRules(): void
             {decl?.kingInCamp && (
               <div className="inline-actions">
                 <span className="note">
-                  入玉宣言（27点法）：{decl.points}/{decl.required}点・敵陣の駒 {decl.piecesInCamp}/10枚
+                  入玉宣言（{state.declareRule}点法）：{decl.points}点
+                  {state.declareRule === '24'
+                    ? `（31点以上で勝ち・24〜30点で持将棋）`
+                    : `／必要${decl.required}点`}
+                  ・敵陣の駒 {decl.piecesInCamp}/10枚
                   {decl.inCheck ? '・王手中は不可' : ''}
                 </span>
                 <button onClick={() => play({ declare: true })} disabled={!decl.ok}>
-                  入玉宣言
+                  {decl.ok && decl.result === 'draw' ? '宣言（持将棋）' : decl.ok && decl.result === 'lose' ? '宣言（負け）' : '入玉宣言'}
                 </button>
               </div>
+            )}
+            {canInput && offerPending(state) && (
+              <div className="offer-banner" role="alert">
+                <span>
+                  相手から持将棋の提案があります（点数 {sideNames[0]} {totalPoints(state, 0)}・{sideNames[1]} {totalPoints(state, 1)}）
+                </span>
+                <div className="inline-actions">
+                  <button onClick={() => play({ decline: true })}>断る</button>
+                  <button className="primary" onClick={() => play({ accept: true })}>
+                    受ける
+                  </button>
+                </div>
+              </div>
+            )}
+            {canInput && !offerPending(state) && bothKingsEntered(state) && (
+              <div className="inline-actions">
+                <button onClick={() => play({ offer: true })} disabled={state.offer === state.turn}>
+                  {state.offer === state.turn ? '提案済み（次の手と一緒に伝わります）' : '持将棋を提案'}
+                </button>
+              </div>
+            )}
+            {!outcome && state.declined !== null && state.declined !== state.turn && (
+              <p className="hint">持将棋の提案は断られました</p>
             )}
             {promoChoice && (
               <div className="sheet-backdrop" onClick={() => setChoice(null)}>

@@ -6,7 +6,7 @@ import { chooseOthelloMove } from '../games/othello/engine';
 import { chooseShogiMove } from '../games/shogi/engine';
 import type { Level } from './types';
 
-const choosers: Record<string, (s: any, level: Level) => unknown> = {
+const choosers: Record<string, (s: any, level: Level, budgetMs?: number) => unknown> = {
   gomoku: chooseGomokuMove,
   othello: chooseOthelloMove,
   chess: chooseChessMove,
@@ -14,8 +14,8 @@ const choosers: Record<string, (s: any, level: Level) => unknown> = {
   go: chooseGoMove,
 };
 
-self.onmessage = (e: MessageEvent<{ id: number; game: string; state: unknown; level: Level }>) => {
-  const { id, game, state, level } = e.data;
-  const move = choosers[game](state, level);
+self.onmessage = (e: MessageEvent<{ id: number; game: string; state: unknown; level: Level; budgetMs?: number }>) => {
+  const { id, game, state, level, budgetMs } = e.data;
+  const move = choosers[game](state, level, budgetMs);
   self.postMessage({ id, move });
 };

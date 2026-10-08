@@ -1,7 +1,20 @@
 import { useState } from 'react';
-import { GameShell } from '../../components/GameShell';
+import { GameShell, Segmented } from '../../components/GameShell';
+import { TIME_PRESETS } from '../../core/timePresets';
 import { useGameSession } from '../../core/useGameSession';
-import { chess, claimableDraw, inCheck, legalMoves, type ChessMove, type Promo } from './engine';
+import {
+  chess,
+  claimableDraw,
+  inCheck,
+  legalMoves,
+  offerPending,
+  type ChessAction,
+  type ChessMove,
+  type ChessOptions,
+  type ChessState,
+  type DrawRule,
+  type Promo,
+} from './engine';
 
 // 白も黒も塗りつぶしの字形を使い、色は CSS で付ける（︎ で絵文字表示を防ぐ）
 const GLYPH: Record<string, string> = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟' };
@@ -9,7 +22,7 @@ const glyph = (p: string) => GLYPH[p.toUpperCase()] + '︎';
 const PROMOS: Promo[] = ['q', 'r', 'b', 'n'];
 
 export function ChessGame({ onBack, onRules }: { onBack(): void; onRules(): void }) {
-  const session = useGameSession('chess', chess, { mode: 'cpu', humanSide: 0, level: 2, options: {} });
+  const session = useGameSession<ChessState, ChessAction, ChessOptions>('chess', chess, { mode: 'cpu', humanSide: 0, level: 2, time: { kind: 'none' }, options: { drawRule: 'fide' } });
   const { state, canInput, play, outcome } = session;
   const [sel, setSel] = useState<{ key: unknown; sq: number } | null>(null);
   const [promo, setPromo] = useState<{ key: unknown; moves: ChessMove[] } | null>(null);
@@ -36,7 +49,30 @@ export function ChessGame({ onBack, onRules }: { onBack(): void; onRules(): void
   };
 
   return (
-    <GameShell title="チェス" sideNames={['白', '黒']} turn={state.turn} session={session} flippable whiteFirst onBack={onBack} onRules={onRules}>
+    <GameShell
+      timePresets={TIME_PRESETS.chess}
+      title="チェス"
+      sideNames={['白', '黒']}
+      turn={state.turn}
+      session={session}
+      flippable
+      whiteFirst
+      onBack={onBack}
+      onRules={onRules}
+      renderOptions={(o, set) => (
+        <fieldset>
+          <legend>3回同形・50手ルール</legend>
+          <Segmented<DrawRule>
+            value={o.drawRule}
+            options={[
+              ['fide', '申請で引き分け（FIDE）'],
+              ['auto', '自動で引き分け'],
+            ]}
+            onChange={(drawRule) => set({ ...o, drawRule })}
+          />
+        </fieldset>
+      )}
+    >
       {({ flipped }) => {
         const order = [...Array(64).keys()];
         if (flipped) order.reverse();
@@ -63,10 +99,29 @@ export function ChessGame({ onBack, onRules }: { onBack(): void; onRules(): void
               })}
             </div>
             <p className="hint">{!outcome && inCheck(state) ? 'チェック！' : ' '}</p>
-            {canInput && claim && (
-              <div className="inline-actions">
-                <button onClick={() => play({ claim: true })}>引き分けを申請（{claim}）</button>
+            {canInput && offerPending(state) && (
+              <div className="offer-banner" role="alert">
+                <span>相手から引き分けの提案があります</span>
+                <div className="inline-actions">
+                  <button onClick={() => play({ decline: true })}>断る</button>
+                  <button className="primary" onClick={() => play({ accept: true })}>
+                    受ける
+                  </button>
+                </div>
               </div>
+            )}
+            {canInput && !offerPending(state) && (
+              <div className="inline-actions">
+                {claim && state.drawRule === 'fide' && (
+                  <button onClick={() => play({ claim: true })}>引き分けを申請（{claim}）</button>
+                )}
+                <button onClick={() => play({ offer: true })} disabled={state.offer === state.turn}>
+                  {state.offer === state.turn ? '提案済み（次の手と一緒に伝わります）' : '引き分けを提案'}
+                </button>
+              </div>
+            )}
+            {!outcome && state.declined !== null && state.declined !== state.turn && (
+              <p className="hint">引き分けの提案は断られました</p>
             )}
             {promoMoves && (
               <div className="sheet-backdrop" onClick={() => setPromo(null)}>

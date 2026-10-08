@@ -16,9 +16,11 @@ export interface GoState {
   phase: 'play' | 'scoring' | 'ended';
   /** 死石と判定された石の位置 */
   dead: number[];
+  /** 白に加える目数（コミと、置き碁の補償の合計） */
   komi: number;
   /** 置石の数（0 = 互先・定先） */
   handicap: number;
+  ruleset: GoRuleset;
   last: number;
   moveCount: number;
   /** 着手後の盤面（同形反復の判定用） */
@@ -37,10 +39,43 @@ export type GoMove =
   /** 死石の確認をやめて対局に戻る */
   | { t: 'resume' };
 
+/**
+ * japanese = 日本ルール（地＋アゲハマで数える。同形反復は無勝負）
+ * chinese  = 中国ルール（石＋地で数える。同じ盤面の再現を禁止する超コウ）
+ * aga      = AGA ルール（石＋地で数える。手番も含めた同じ局面の再現を禁止。白が最後にパスして終局）
+ */
+export type GoRuleset = 'japanese' | 'chinese' | 'aga';
+
+export const RULESET_NAMES: Record<GoRuleset, string> = {
+  japanese: '日本ルール',
+  chinese: '中国ルール',
+  aga: 'AGAルール',
+};
+
+/** ルールごとの標準のコミ */
+export const DEFAULT_KOMI: Record<GoRuleset, number> = { japanese: 6.5, chinese: 7.5, aga: 7.5 };
+
 export interface GoOptions {
   size: number;
-  /** 'even' = 互先（コミ6目半）, 'sente' = 定先（コミなし）, 数値 = 置石の数 */
+  /** 'even' = 互先, 'sente' = 定先, 数値 = 置石の数 */
   handicap: 'even' | 'sente' | number;
+  ruleset: GoRuleset;
+  /** 互先のコミ */
+  komi: number;
+}
+
+/** 石＋地で数えるルールか */
+export const isAreaScoring = (r: GoRuleset) => r !== 'japanese';
+
+/**
+ * 白に加える目数。互先は選んだコミ。
+ * 定先・置き碁: 日本はなし、中国は置石の数、AGA は置石の数 − 1 に半目を加える。
+ */
+export function compensation(ruleset: GoRuleset, handicap: GoOptions['handicap'], komi: number, stones: number): number {
+  if (handicap === 'even') return komi;
+  if (ruleset === 'chinese') return stones;
+  if (ruleset === 'aga') return Math.max(0, stones - 1) + 0.5;
+  return 0;
 }
 
 /** 置石の位置（黒から見た標準の配置）。row 0 が盤の上辺 */
@@ -150,8 +185,25 @@ function tryPlay(board: number[], size: number, p: number, color: number): PlayR
   return { board: next, captured, ko };
 }
 
+const seenCache = new WeakMap<string[], { positional: Set<string>; situational: Set<string> }>();
+function seenSets(seen: string[]) {
+  let sets = seenCache.get(seen);
+  if (!sets) {
+    sets = { positional: new Set(seen.map((k) => k.slice(0, -1))), situational: new Set(seen) };
+    seenCache.set(seen, sets);
+  }
+  return sets;
+}
+
 export function isLegalPlay(s: GoState, p: number): boolean {
-  return s.phase === 'play' && p !== s.ko && tryPlay(s.board, s.size, p, s.turn + 1) !== null;
+  if (s.phase !== 'play' || p === s.ko) return false;
+  const res = tryPlay(s.board, s.size, p, s.turn + 1);
+  if (!res) return false;
+  if (s.ruleset === 'japanese') return true;
+  // 超コウ: 過去の局面を再現する手は打てない
+  const sets = seenSets(s.seen);
+  if (s.ruleset === 'chinese') return !sets.positional.has(res.board.join(''));
+  return !sets.situational.has(boardKey(res.board, s.turn === 0 ? 1 : 0));
 }
 
 // ---------------------------------------------------------------- 地の計算
@@ -218,11 +270,24 @@ export function score(s: GoState): Score {
     }
   }
 
+  const area = isAreaScoring(s.ruleset);
   for (const r of regions) {
     if (r.borders.size !== 1) continue;
-    if ([...r.stones].some((st) => inSeki[st])) continue;
+    // 日本ルールではセキの眼は地にならない（石＋地で数えるルールでは数える）
+    if (!area && [...r.stones].some((st) => inSeki[st])) continue;
     const owner = [...r.borders][0];
     for (const j of r.points) territory[j] = owner;
+  }
+  if (area) {
+    // 石＋地: 盤上の生きている石と、その石だけで囲んだ空点を数える
+    let black = 0;
+    let white = s.komi;
+    for (let i = 0; i < n; i++) {
+      const v = alive[i] || territory[i];
+      if (v === 1) black++;
+      else if (v === 2) white++;
+    }
+    return { black, white, territory };
   }
   let black = s.captures[0];
   let white = s.captures[1] + s.komi;
@@ -342,11 +407,11 @@ function toggleGroup(s: GoState, p: number): number[] {
 }
 
 export const go: GameEngine<GoState, GoMove, GoOptions> = {
-  initial({ size, handicap }) {
+  initial({ size, handicap, ruleset, komi }) {
     const board = new Array(size * size).fill(0);
     const stones = typeof handicap === 'number' ? Math.min(handicap, maxHandicap(size)) : 0;
     for (const p of handicapPoints(size, stones)) board[p] = 1;
-    // 置き碁は白から打ち、コミはなし。定先もコミなし
+    // 置き碁は白から打つ
     const turn: Player = stones >= 2 ? 1 : 0;
     return {
       size,
@@ -357,8 +422,9 @@ export const go: GameEngine<GoState, GoMove, GoOptions> = {
       passes: 0,
       phase: 'play',
       dead: [],
-      komi: handicap === 'even' ? 6.5 : 0,
+      komi: compensation(ruleset, handicap, komi, stones),
       handicap: stones,
+      ruleset,
       last: -1,
       moveCount: 0,
       seen: [boardKey(board, turn)],
@@ -367,6 +433,7 @@ export const go: GameEngine<GoState, GoMove, GoOptions> = {
   },
   turn: (s) => s.turn,
   cpuCanAct: (s) => s.phase === 'play',
+  clockRunning: (s) => s.phase === 'play' && !s.noResult,
   apply(s, m) {
     const next = s.turn === 0 ? 1 : 0;
     switch (m.t) {
@@ -376,7 +443,7 @@ export const go: GameEngine<GoState, GoMove, GoOptions> = {
         captures[s.turn] += res.captured;
         const key = boardKey(res.board, next);
         // 同じ全局面が 3 回目に現れたら、三コウ・長生などの循環とみなして無勝負
-        const noResult = s.noResult || s.seen.filter((k) => k === key).length >= 2;
+        const noResult = s.noResult || (s.ruleset === 'japanese' && s.seen.filter((k) => k === key).length >= 2);
         return {
           ...s,
           board: res.board,
@@ -393,6 +460,8 @@ export const go: GameEngine<GoState, GoMove, GoOptions> = {
       case 'pass': {
         const after: GoState = { ...s, turn: next, ko: -1, passes: s.passes + 1, last: -1, moveCount: s.moveCount + 1 };
         if (after.passes < 2) return after;
+        // AGA ルールでは、白のパスで終わらなければならない
+        if (s.ruleset === 'aga' && s.turn !== 1) return after;
         return { ...after, phase: 'scoring', dead: estimateDead(after) };
       }
       case 'toggle':
@@ -408,9 +477,10 @@ export const go: GameEngine<GoState, GoMove, GoOptions> = {
     if (s.phase !== 'ended') return null;
     const { black, white } = score(s);
     const diff = Math.abs(black - white);
-    const reason = `黒 ${black}目・白 ${white}目`;
+    const unit = isAreaScoring(s.ruleset) ? '点' : '目';
+    const reason = `黒 ${black}${unit}・白 ${white}${unit}`;
     if (black === white) return { winner: null, reason: `持碁（${reason}）` };
-    return { winner: black > white ? 0 : 1, reason: `${diff}目差（${reason}）` };
+    return { winner: black > white ? 0 : 1, reason: `${diff}${unit}差（${reason}）` };
   },
 };
 
@@ -429,7 +499,7 @@ function areaDiff(board: number[], size: number, color: number, komi: number): n
   return color === 1 ? diff : -diff;
 }
 
-export function chooseGoMove(s: GoState, level: Level): GoMove {
+export function chooseGoMove(s: GoState, level: Level, budgetMs?: number): GoMove {
   const size = s.size;
   const n = size * size;
   const color = s.turn + 1;
@@ -462,7 +532,7 @@ export function chooseGoMove(s: GoState, level: Level): GoMove {
   if (level === 1 && rand() < 0.3) return { t: 'play', p: cands[Math.floor(rand() * cands.length)] };
 
   // 平坦なモンテカルロ（UCB1 で候補を選び、ランダムに打ち切る）
-  const timeMs = level === 1 ? 500 : level === 2 ? 1500 : 3500;
+  const timeMs = Math.max(150, Math.min(level === 1 ? 500 : level === 2 ? 1500 : 3500, budgetMs ?? Infinity));
   const end = Date.now() + timeMs;
   const after = cands.map((p) => tryPlay(s.board, size, p, color)!.board);
   const wins = new Array(cands.length).fill(0);

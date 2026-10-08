@@ -15,7 +15,7 @@ export interface AiRequest<M> {
 }
 
 /** CPU の手を Web Worker で考える。思考中も画面は固まらない */
-export function requestAiMove<M>(game: string, state: unknown, level: Level): AiRequest<M> {
+export function requestAiMove<M>(game: string, state: unknown, level: Level, budgetMs?: number): AiRequest<M> {
   const id = nextId++;
   const w = getWorker();
   let settled = false;
@@ -32,7 +32,7 @@ export function requestAiMove<M>(game: string, state: unknown, level: Level): Ai
       w.removeEventListener('message', onMessage);
       reject(new Error('cancelled'));
     };
-    w.postMessage({ id, game, state, level });
+    w.postMessage({ id, game, state, level, budgetMs });
   });
   promise.catch(() => {});
   return {

@@ -189,7 +189,7 @@ function searchRoot(board: number[], color: number, moves: number[], depth: numb
   return best;
 }
 
-export function chooseOthelloMove(s: OthelloState, level: Level): OthelloMove {
+export function chooseOthelloMove(s: OthelloState, level: Level, budgetMs?: number): OthelloMove {
   const color = s.turn + 1;
   const moves = legalMoves(s);
   if (moves.length === 1) return moves[0];
@@ -211,7 +211,7 @@ export function chooseOthelloMove(s: OthelloState, level: Level): OthelloMove {
   const empties = s.board.filter((v) => v === 0).length;
   const maxDepth = level === 2 ? 3 : 7;
   const exactAt = level === 2 ? 6 : 12;
-  const deadline = new Deadline(level === 2 ? 1500 : 3000);
+  const deadline = new Deadline(level === 2 ? 1500 : 3000, budgetMs);
   const ordered = moves.slice().sort((a, b) => WEIGHTS[b] - WEIGHTS[a]);
   let best = ordered[0];
   try {

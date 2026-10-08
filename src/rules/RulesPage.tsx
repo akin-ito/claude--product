@@ -5,6 +5,7 @@ import { goRules } from './content/go';
 import { gomokuRules } from './content/gomoku';
 import { othelloRules } from './content/othello';
 import { shogiRules } from './content/shogi';
+import { TimeRules } from './TimeRules';
 import type { RulesContent } from './types';
 
 const CONTENT: Record<string, RulesContent> = {
@@ -44,7 +45,16 @@ export function RulesPage({ gameId, name, onBack, onPlay }: { gameId: string; na
           onChange={setTab}
         />
       </div>
-      <article className="rules-body">{tab === 'beginner' ? content.beginner : content.rulebook}</article>
+      <article className="rules-body">
+        {tab === 'beginner' ? (
+          content.beginner
+        ) : (
+          <>
+            {content.rulebook}
+            <TimeRules gameId={gameId} />
+          </>
+        )}
+      </article>
       <div className="rules-foot">
         {tab === 'beginner' && (
           <button onClick={() => setTab('rulebook')}>詳しいルールを読む</button>

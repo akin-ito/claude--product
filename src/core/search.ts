@@ -3,8 +3,9 @@ export class Deadline {
   private readonly end: number;
   private counter = 0;
 
-  constructor(ms: number) {
-    this.end = Date.now() + ms;
+  /** budgetMs（持ち時間から決めた上限）があれば、短い方を使う */
+  constructor(ms: number, budgetMs?: number) {
+    this.end = Date.now() + Math.max(50, Math.min(ms, budgetMs ?? Infinity));
   }
 
   check(): void {

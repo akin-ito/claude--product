@@ -49,10 +49,20 @@ const HANDICAP_SQUARES: Record<Handicap, number[]> = {
 
 export interface ShogiOptions {
   handicap: Handicap;
+  declareRule: DeclareRule;
 }
 
 export interface ShogiState extends ShogiPos {
   handicap: Handicap;
+  declareRule: DeclareRule;
+  /** 持将棋を提案している側（相入玉のときのみ） */
+  offer: Player | null;
+  /** 直前に提案を断った側（表示用） */
+  declined: Player | null;
+  /** 合意で持将棋が成立した */
+  agreed: boolean;
+  /** 入玉宣言の結果 */
+  declareResult: 'win' | 'draw' | 'lose' | null;
   /** 最初に指した手番（駒落ちは上手 = 1 から指す） */
   startTurn: Player;
   /** 入玉宣言が成立した手番 */
@@ -299,20 +309,35 @@ function repetition(s: ShogiState): Outcome | null {
 const BIG_PIECES = new Set([KA, HI, UM, RY]);
 const piecePoints = (t: number) => (t === OU ? 0 : BIG_PIECES.has(t) ? 5 : 1);
 
+/**
+ * 入玉宣言の方式
+ *   27 = 27点法（アマチュア大会など）: 先手28点・後手27点以上で宣言勝ち。条件を満たさない宣言はできない
+ *   24 = 24点法（プロ公式戦）: 31点以上で勝ち、24〜30点で持将棋、23点以下で負け
+ */
+export type DeclareRule = '27' | '24';
+
 export interface Declaration {
-  /** 宣言の条件をすべて満たしているか */
+  /** 宣言できるか（27点法は勝てる場合のみ、24点法は点数以外の条件を満たせば宣言できる） */
   ok: boolean;
+  /** 宣言したときの結果 */
+  result: 'win' | 'draw' | 'lose';
   kingInCamp: boolean;
   /** 敵陣にある玉以外の駒の枚数（10枚以上必要） */
   piecesInCamp: number;
   /** 点数（駒落ちの上手は落とした駒の点数を含む） */
   points: number;
-  /** 必要な点数（先手・下手 28点、後手・上手 27点） */
+  /** 勝ちに必要な点数 */
   required: number;
   inCheck: boolean;
 }
 
-/** 手番側が入玉宣言（27点法）できるか */
+/** 駒落ちで上手が落とした駒の点数 */
+function handicapPoints(h: Handicap): number {
+  const start = initialPos().board;
+  return HANDICAP_SQUARES[h].reduce((sum, sq) => sum + piecePoints(Math.abs(start[sq])), 0);
+}
+
+/** 手番側が入玉宣言したらどうなるか */
 export function declaration(s: ShogiState): Declaration {
   const p = s.turn;
   const sg = sign(p);
@@ -331,28 +356,55 @@ export function declaration(s: ShogiState): Declaration {
   }
   for (let t = FU; t <= HI; t++) points += s.hands[p][t] * piecePoints(t);
   // 駒落ちでは、落とした駒の点数を上手に加える
-  if (p === 1) for (const sq of HANDICAP_SQUARES[s.handicap]) points += piecePoints(Math.abs(initialPos().board[sq]));
-  const required = p === 0 ? 28 : 27;
+  if (p === 1) points += handicapPoints(s.handicap);
   const check = inCheck(s);
-  return {
-    ok: kingInCamp && piecesInCamp >= 10 && points >= required && !check,
-    kingInCamp,
-    piecesInCamp,
-    points,
-    required,
-    inCheck: check,
-  };
+  const conditions = kingInCamp && piecesInCamp >= 10 && !check;
+  if (s.declareRule === '24') {
+    const result = points >= 31 ? 'win' : points >= 24 ? 'draw' : 'lose';
+    return { ok: conditions, result, kingInCamp, piecesInCamp, points, required: 31, inCheck: check };
+  }
+  const required = p === 0 ? 28 : 27;
+  return { ok: conditions && points >= required, result: 'win', kingInCamp, piecesInCamp, points, required, inCheck: check };
 }
 
-/** 盤上の手、または入玉宣言 */
-export type ShogiAction = ShogiMove | { declare: true };
+/** 盤上と持ち駒を合わせた全部の駒の点数（合意による持将棋の判定用） */
+export function totalPoints(s: ShogiState, p: Player): number {
+  let points = 0;
+  for (const v of s.board) if (v !== 0 && owner(v) === p) points += piecePoints(Math.abs(v));
+  for (let t = FU; t <= HI; t++) points += s.hands[p][t] * piecePoints(t);
+  if (p === 1) points += handicapPoints(s.handicap);
+  return points;
+}
+
+/** 両方の玉が敵陣に入っている（相入玉） */
+export function bothKingsEntered(s: ShogiPos): boolean {
+  const sente = s.board.indexOf(OU);
+  const gote = s.board.indexOf(-OU);
+  return sente >= 0 && gote >= 0 && Math.floor(sente / 9) <= 2 && Math.floor(gote / 9) >= 6;
+}
+
+/** 相手から持将棋の提案が出ているか */
+export const offerPending = (s: ShogiState) => s.offer !== null && s.offer !== s.turn;
+
+/** 盤上の手、入玉宣言、持将棋の提案・受諾・拒否 */
+export type ShogiAction =
+  | ShogiMove
+  | { declare: true }
+  | { offer: true }
+  | { accept: true }
+  | { decline: true };
 
 export const shogi: GameEngine<ShogiState, ShogiAction, ShogiOptions> = {
-  initial({ handicap }) {
+  initial({ handicap, declareRule }) {
     const pos = initialPos(handicap);
     return {
       ...pos,
       handicap,
+      declareRule,
+      offer: null,
+      declined: null,
+      agreed: false,
+      declareResult: null,
       startTurn: pos.turn,
       declared: null,
       keys: [positionKey(pos)],
@@ -362,18 +414,37 @@ export const shogi: GameEngine<ShogiState, ShogiAction, ShogiOptions> = {
   },
   turn: (s) => s.turn,
   apply(s, m) {
-    if ('declare' in m) return declaration(s).ok ? { ...s, declared: s.turn } : s;
+    if ('declare' in m) {
+      const d = declaration(s);
+      return d.ok ? { ...s, declared: s.turn, declareResult: d.result } : s;
+    }
+    if ('offer' in m) return bothKingsEntered(s) ? { ...s, offer: s.turn } : s;
+    if ('accept' in m) return offerPending(s) ? { ...s, agreed: true } : s;
+    if ('decline' in m) return offerPending(s) ? { ...s, offer: null, declined: s.turn } : s;
     const pos = makeMove(s, m);
     return {
       ...s,
       ...pos,
+      offer: s.offer === s.turn ? s.offer : null,
+      declined: offerPending(s) ? s.turn : null,
       keys: [...s.keys, positionKey(pos)],
       checks: [...s.checks, inCheck(pos)],
       lastMove: m,
     };
   },
   outcome(s): Outcome | null {
-    if (s.declared !== null) return { winner: s.declared, reason: '入玉宣言' };
+    if (s.declared !== null) {
+      const other: Player = s.declared === 0 ? 1 : 0;
+      if (s.declareResult === 'draw') return { winner: null, reason: '持将棋（入玉宣言・24点法）' };
+      if (s.declareResult === 'lose') return { winner: other, reason: '入玉宣言の点数不足' };
+      return { winner: s.declared, reason: '入玉宣言' };
+    }
+    if (s.agreed) {
+      // 合意による持将棋: 24点に満たない側は負け
+      const short = ([0, 1] as Player[]).filter((p) => totalPoints(s, p) < 24);
+      if (short.length === 1) return { winner: short[0] === 0 ? 1 : 0, reason: '持将棋（24点に満たず）' };
+      return { winner: null, reason: '持将棋（合意）' };
+    }
     const rep = repetition(s);
     if (rep) return rep;
     if (legalMoves(s).length === 0) return { winner: s.turn === 0 ? 1 : 0, reason: '詰み' };
@@ -476,8 +547,13 @@ function search(p: ShogiPos, depth: number, alpha: number, beta: number, ply: nu
   return best;
 }
 
-export function chooseShogiMove(s: ShogiState, level: Level): ShogiAction {
-  if (declaration(s).ok) return { declare: true };
+export function chooseShogiMove(s: ShogiState, level: Level, budgetMs?: number): ShogiAction {
+  const d = declaration(s);
+  if (d.ok && d.result === 'win') return { declare: true };
+  // 持将棋の提案は、負けにならず形勢も良くないときだけ受ける
+  if (offerPending(s)) {
+    if (totalPoints(s, s.turn) >= 24 && evaluate(s) < 100) return { accept: true };
+  }
   // 同じ評価の手が並んだとき、毎回同じ手にならないよう先に混ぜておく
   const moves = orderMoves(s, shuffle(legalMoves(s)));
   if (moves.length === 1) return moves[0];
@@ -496,7 +572,7 @@ export function chooseShogiMove(s: ShogiState, level: Level): ShogiAction {
   }
 
   const maxDepth = level === 2 ? 2 : 4;
-  const deadline = new Deadline(level === 2 ? 2000 : 4000);
+  const deadline = new Deadline(level === 2 ? 2000 : 4000, budgetMs);
   let ordered = moves;
   let best = moves[0];
   try {

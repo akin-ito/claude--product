@@ -22,6 +22,10 @@ export interface GameEngine<S, M, O = Record<string, never>> {
   outcome(s: S): Outcome | null;
   /** CPU が手を指してよい局面か（囲碁の死石確認中などは false） */
   cpuCanAct?(s: S): boolean;
+  /** 時計を進める局面か（囲碁の死石確認中などは false） */
+  clockRunning?(s: S): boolean;
+  /** loser が時間切れになったときの結果（既定は loser の負け） */
+  timeoutOutcome?(s: S, loser: Player): Outcome;
 }
 
 export const other = (p: Player): Player => (p === 0 ? 1 : 0);

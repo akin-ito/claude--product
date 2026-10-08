@@ -1070,3 +1070,157 @@ button:disabled {
   dominant-baseline: middle;
   fill: #1b1b1b;
 }
+
+/* ------------------------------------------------------------ 時計 */
+
+.dot-black {
+  background: #1b1b1b;
+}
+.dot-white {
+  background: #fafafa;
+}
+
+.clockbar {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  max-width: 600px;
+  padding: 0 8px 6px;
+}
+
+.clock {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: 'name time' 'sub time';
+  align-items: center;
+  column-gap: 8px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.clock.active {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.clock.low .clock-time {
+  color: var(--lose);
+}
+
+.clock-name {
+  grid-area: name;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.clock-sub {
+  grid-area: sub;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.clock-time {
+  grid-area: time;
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.sheet {
+  max-height: 88dvh;
+  overflow-y: auto;
+}
+
+.time-detail {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.num-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.num-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.num-field input {
+  width: 72px;
+  min-height: 40px;
+  padding: 0 8px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  text-align: right;
+}
+
+.game:has(.clockbar) {
+  --board: min(calc(100vw - 16px), calc(100dvh - 310px), 560px);
+}
+
+.game:has(.clockbar):has(.shogi) {
+  --board: min(calc(100vw - 40px), calc(100dvh - 420px), 520px);
+}
+
+.offer-banner {
+  width: var(--board);
+  max-width: 100%;
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--accent);
+  background: var(--surface);
+  font-weight: 600;
+  text-align: center;
+}
+
+.offer-banner .inline-actions {
+  width: 100%;
+}
+
+.area-box {
+  fill: rgba(233, 75, 60, 0.12);
+  stroke: #e94b3c;
+  stroke-width: 0.05;
+  stroke-dasharray: 0.2 0.12;
+}
+
+.proposal-label {
+  font-size: 0.5px;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  fill: #fff;
+}
+
+.opening-hint {
+  color: var(--text);
+  font-weight: 600;
+  width: var(--board);
+  max-width: 100%;
+}
+
+.inline-actions .select {
+  flex: 1;
+}

@@ -1,7 +1,20 @@
 import { GameShell, Segmented, Select, useConfirmTap } from '../../components/GameShell';
 import { IntersectionBoard, Stone } from '../../components/IntersectionBoard';
+import { TIME_PRESETS } from '../../core/timePresets';
 import { useGameSession } from '../../core/useGameSession';
-import { go, isLegalPlay, maxHandicap, score, type GoMove, type GoOptions, type GoState } from './engine';
+import {
+  DEFAULT_KOMI,
+  go,
+  isAreaScoring,
+  isLegalPlay,
+  maxHandicap,
+  RULESET_NAMES,
+  score,
+  type GoMove,
+  type GoOptions,
+  type GoRuleset,
+  type GoState,
+} from './engine';
 
 function starPoints(size: number): number[] {
   const at = (r: number, c: number) => r * size + c;
@@ -12,26 +25,32 @@ function starPoints(size: number): number[] {
   return out;
 }
 
-function handicapOptions(size: number): [string, string][] {
+function handicapOptions(size: number, ruleset: GoRuleset): [string, string][] {
+  const comp = (k: number) =>
+    ruleset === 'chinese' ? `白に${k}目` : ruleset === 'aga' ? `白に${k - 1 + 0.5}目` : 'コミなし';
   const out: [string, string][] = [
-    ['even', '互先（黒番・コミ6目半）'],
-    ['sente', '定先（黒番・コミなし）'],
+    ['even', '互先（黒番・コミあり）'],
+    ['sente', `定先（黒番・${ruleset === 'aga' ? '白に0.5目' : 'コミなし'}）`],
   ];
-  for (let k = 2; k <= maxHandicap(size); k++) out.push([String(k), `${k}子局（置き碁・コミなし）`]);
+  for (let k = 2; k <= maxHandicap(size); k++) out.push([String(k), `${k}子局（置き碁・${comp(k)}）`]);
   return out;
 }
+
+const KOMI_CHOICES = [7.5, 6.5, 5.5, 0.5, 0];
 
 export function GoGame({ onBack, onRules }: { onBack(): void; onRules(): void }) {
   const session = useGameSession<GoState, GoMove, GoOptions>('go', go, {
     mode: 'cpu',
     humanSide: 0,
     level: 2,
-    options: { size: 9, handicap: 'even' },
+    time: { kind: 'none' },
+    options: { size: 9, handicap: 'even', ruleset: 'japanese', komi: 6.5 },
   });
   const { state, canInput, play } = session;
   const { size } = state;
   const confirm = useConfirmTap(state);
   const scoring = state.phase !== 'play';
+  const unit = isAreaScoring(state.ruleset) ? '点' : '目';
   const sc = scoring ? score(state) : null;
   const dead = new Set(state.dead);
 
@@ -46,6 +65,7 @@ export function GoGame({ onBack, onRules }: { onBack(): void; onRules(): void })
 
   return (
     <GameShell
+      timePresets={TIME_PRESETS.go}
       title="囲碁"
       sideNames={['黒', '白']}
       turn={state.turn}
@@ -54,6 +74,14 @@ export function GoGame({ onBack, onRules }: { onBack(): void; onRules(): void })
       onRules={onRules}
       renderOptions={(o, set) => (
         <>
+          <fieldset>
+            <legend>ルール</legend>
+            <Segmented<GoRuleset>
+              value={o.ruleset}
+              options={(Object.keys(RULESET_NAMES) as GoRuleset[]).map((r) => [r, RULESET_NAMES[r]] as [GoRuleset, string])}
+              onChange={(ruleset) => set({ ...o, ruleset, komi: DEFAULT_KOMI[ruleset] })}
+            />
+          </fieldset>
           <fieldset>
             <legend>盤の大きさ</legend>
             <Segmented
@@ -66,7 +94,7 @@ export function GoGame({ onBack, onRules }: { onBack(): void; onRules(): void })
               onChange={(v) => {
                 const size = Number(v);
                 const handicap = typeof o.handicap === 'number' ? Math.min(o.handicap, maxHandicap(size)) : o.handicap;
-                set({ size, handicap });
+                set({ ...o, size, handicap });
               }}
             />
           </fieldset>
@@ -74,19 +102,36 @@ export function GoGame({ onBack, onRules }: { onBack(): void; onRules(): void })
             <legend>手合い（置き碁は白が先に打ちます）</legend>
             <Select
               value={String(o.handicap)}
-              options={handicapOptions(o.size)}
+              options={handicapOptions(o.size, o.ruleset)}
               onChange={(v) => set({ ...o, handicap: v === 'even' || v === 'sente' ? v : Number(v) })}
             />
           </fieldset>
+          {o.handicap === 'even' && (
+            <fieldset>
+              <legend>コミ</legend>
+              <Select
+                value={String(o.komi)}
+                options={KOMI_CHOICES.map((k) => [String(k), `${k}目${k === DEFAULT_KOMI[o.ruleset] ? '（このルールの標準）' : ''}`] as [string, string])}
+                onChange={(v) => set({ ...o, komi: Number(v) })}
+              />
+            </fieldset>
+          )}
         </>
       )}
     >
       {() => (
         <>
           <div className="scoreline">
-            <span>黒アゲハマ {state.captures[0]}</span>
-            <span>白アゲハマ {state.captures[1]}</span>
-            <span>{state.handicap ? `${state.handicap}子局` : `コミ ${state.komi}`}</span>
+            <span>{RULESET_NAMES[state.ruleset]}</span>
+            {!isAreaScoring(state.ruleset) && (
+              <span>
+                アゲハマ 黒{state.captures[0]}・白{state.captures[1]}
+              </span>
+            )}
+            <span>
+              {state.handicap ? `${state.handicap}子局・` : ''}
+              {state.komi ? `白に${state.komi}${unit}` : 'コミなし'}
+            </span>
           </div>
           <IntersectionBoard size={size} stars={starPoints(size)} label="碁盤" onTap={canInput ? onTap : undefined}>
             {sc &&
@@ -128,7 +173,9 @@ export function GoGame({ onBack, onRules }: { onBack(): void; onRules(): void })
               <p className="hint">
                 死石の確認：石をタップすると生き／死にを切り替えられます。
                 <br />
-                現在 黒 {sc.black}目・白 {sc.white}目
+                現在 黒 {sc.black}
+                {unit}・白 {sc.white}
+                {unit}
               </p>
               <div className="inline-actions">
                 <button onClick={() => play({ t: 'resume' })} disabled={!canInput}>
